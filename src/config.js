@@ -3,7 +3,7 @@ import "dotenv/config";
 const config = {
   botToken: process.env.BOT_TOKEN,
   geminiKey: process.env.GEMINI_API_KEY,
-  model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+  model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
   ownerId: Number(process.env.OWNER_ID || 0),
 };
 
