@@ -13,7 +13,9 @@ const TASK_SYSTEM = `You are a precise assistant. Follow the user's instruction 
 let client = null;
 
 export function initAI() {
-  client = new GoogleGenAI({ apiKey: config.geminiKey });
+  if (config.geminiKey) {
+    client = new GoogleGenAI({ apiKey: config.geminiKey });
+  }
   return client;
 }
 
