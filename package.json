@@ -1,0 +1,27 @@
+{
+  "name": "maddybot",
+  "version": "1.0.0",
+  "description": "MaddyBot — a multi-purpose Telegram assistant",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "assistant",
+    "nodejs"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.9.0",
+    "dotenv": "^16.4.7",
+    "figlet": "^1.8.0",
+    "grammy": "^1.30.0",
+    "qrcode": "^1.5.4"
+  }
+}
