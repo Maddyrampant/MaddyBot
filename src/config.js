@@ -10,11 +10,13 @@ const config = {
 export function validate() {
   const missing = [];
   if (!config.botToken) missing.push("BOT_TOKEN");
-  if (!config.geminiKey) missing.push("GEMINI_API_KEY");
   if (missing.length) {
     console.error("Missing required environment variables: " + missing.join(", "));
     console.error("Copy .env.example to .env and fill in the values.");
     return false;
+  }
+  if (!config.geminiKey) {
+    console.warn("GEMINI_API_KEY is not set. Chat and AI commands will show a setup hint until you add it.");
   }
   return true;
 }

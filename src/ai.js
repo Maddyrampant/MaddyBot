@@ -22,6 +22,9 @@ export function getAI() {
 }
 
 export async function generate(contents, system = TASK_SYSTEM, extra = {}) {
+  if (!config.geminiKey) {
+    throw new Error("NO_GEMINI_KEY");
+  }
   if (!client) initAI();
   const res = await client.models.generateContent({
     model: config.model,

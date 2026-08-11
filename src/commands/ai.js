@@ -76,6 +76,9 @@ export default function register(bot, { memory }) {
         const answer = await singlePrompt(prompt);
         await replyLong(answer)(ctx);
       } catch (err) {
+        if (err.message === "NO_GEMINI_KEY") {
+          return ctx.reply(setupHint());
+        }
         console.error("AI command error " + name + ":", err);
         await ctx.reply("Something went wrong. Please try again.");
       }
@@ -93,6 +96,9 @@ export default function register(bot, { memory }) {
       memory.push(id, answer, "assistant");
       await replyLong(answer)(ctx);
     } catch (err) {
+      if (err.message === "NO_GEMINI_KEY") {
+        return ctx.reply(setupHint());
+      }
       console.error("ask error:", err);
       await ctx.reply("Something went wrong. Please try again.");
     }
@@ -124,6 +130,10 @@ function needTextUsage(name) {
     plan: "<goal>",
   };
   return usages[name] || "<text>";
+}
+
+function setupHint() {
+  return "For smart chat I need a Gemini API key.\nAdd GEMINI_API_KEY to your .env file (free at https://aistudio.google.com), then restart the bot.";
 }
 
 function userIdFrom(ctx) {

@@ -102,6 +102,13 @@ async function handleChat(ctx, text) {
     memory.push(id, answer, "assistant");
     await replyLong(answer)(ctx);
   } catch (err) {
+    if (err.message === "NO_GEMINI_KEY") {
+      return ctx.reply(
+        "Smart chat is disabled until GEMINI_API_KEY is set in the .env file.\n" +
+          "Get a free key at https://aistudio.google.com, add it, and restart the bot.\n\n" +
+          "Meanwhile, try /commands to use the other tools."
+      );
+    }
     console.error("chat error:", err);
     await ctx.reply("Sorry, something went wrong. Please try again.");
   }
