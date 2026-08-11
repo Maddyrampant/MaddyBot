@@ -11,6 +11,12 @@ const GROUPS = [
   ["games", "Games"],
   ["personal", "Personal"],
   ["group", "Group Admin"],
+  ["productivity", "Productivity"],
+  ["finance", "Finance"],
+  ["health", "Health"],
+  ["knowledge", "Knowledge"],
+  ["dev", "Developer"],
+  ["extra", "Utilities"],
 ];
 
 export function reg(name, meta) {
@@ -75,5 +81,37 @@ export function clamp(n, min, max) {
 }
 
 export function isAdmin(user) {
-  return ["administrator", "creator"].includes(user.status);
+  return ["administrator", "creator"].includes(user?.status);
+}
+
+export function setupHint() {
+  return (
+    "For smart features I need a Gemini API key.\n" +
+    "Add GEMINI_API_KEY to your .env file (free at https://aistudio.google.com), then restart the bot."
+  );
+}
+
+export function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export function todayStr() {
+  const d = new Date();
+  return (
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0")
+  );
+}
+
+export function fmtNum(n) {
+  return Number(n).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }

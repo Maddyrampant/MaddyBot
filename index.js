@@ -18,6 +18,12 @@ import registerFun from "./src/commands/fun.js";
 import registerGames from "./src/commands/games.js";
 import registerPersonal from "./src/commands/personal.js";
 import registerGroup from "./src/commands/group.js";
+import registerProductivity from "./src/commands/productivity.js";
+import registerFinance from "./src/commands/finance.js";
+import registerHealth from "./src/commands/health.js";
+import registerKnowledge from "./src/commands/knowledge.js";
+import registerDev from "./src/commands/dev.js";
+import registerExtra from "./src/commands/extra.js";
 
 if (!validate()) process.exit(1);
 
@@ -40,6 +46,12 @@ registerFun(bot);
 registerGames(bot);
 registerPersonal(bot, deps);
 registerGroup(bot, deps);
+registerProductivity(bot, deps);
+registerFinance(bot, deps);
+registerHealth(bot, deps);
+registerKnowledge(bot);
+registerDev(bot);
+registerExtra(bot);
 
 startScheduler(bot, store);
 

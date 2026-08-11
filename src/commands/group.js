@@ -4,6 +4,7 @@ import config from "../config.js";
 export default function register(bot, { store }) {
   if (!store.data.welcome) store.data.welcome = {};
   if (!store.data.warns) store.data.warns = {};
+  if (!store.data.rules) store.data.rules = {};
 
   reg("welcome", { usage: "set <text>", desc: "Show or set the group welcome message", group: "group" });
   reg("kick", { desc: "Kick a user (reply to them)", group: "group" });
@@ -13,6 +14,10 @@ export default function register(bot, { store }) {
   reg("unmute", { desc: "Unmute a user (reply to them)", group: "group" });
   reg("warn", { desc: "Warn a user, 3 warns = kick", group: "group" });
   reg("admins", { desc: "List group administrators", group: "group" });
+  reg("pin", { desc: "Pin a message (reply to it)", group: "group" });
+  reg("unpin", { desc: "Unpin the last pinned message", group: "group" });
+  reg("rules", { usage: "set <text> | show", desc: "Group rules", group: "group" });
+  reg("slow", { usage: "<seconds> | off", desc: "Slow mode for the group", group: "group" });
 
   bot.command("welcome", async (ctx) => {
     const chatId = String(ctx.chat.id);
@@ -140,6 +145,63 @@ export default function register(bot, { store }) {
       return ctx.reply("Admins:\n" + lines.join("\n"));
     } catch {
       return ctx.reply("Could not fetch the admin list.");
+    }
+  });
+
+  bot.command("pin", async (ctx) => {
+    if (!(await isAdminUser(ctx))) return ctx.reply("Only administrators can do this.");
+    const reply = ctx.message.reply_to_message;
+    if (!reply) return ctx.reply("Reply to a message to pin it.");
+    try {
+      await ctx.api.pinChatMessage(ctx.chat.id, reply.message_id);
+      return ctx.reply("Message pinned.");
+    } catch {
+      return ctx.reply("I need admin rights to pin messages.");
+    }
+  });
+
+  bot.command("unpin", async (ctx) => {
+    if (!(await isAdminUser(ctx))) return ctx.reply("Only administrators can do this.");
+    try {
+      await ctx.api.unpinChatMessage(ctx.chat.id);
+      return ctx.reply("Latest pinned message removed.");
+    } catch {
+      return ctx.reply("I need admin rights to unpin messages.");
+    }
+  });
+
+  bot.command("rules", async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const args = argText(ctx);
+    if (/^set\s+/i.test(args)) {
+      if (!(await isAdminUser(ctx))) return ctx.reply("Only administrators can do this.");
+      const text = args.replace(/^set\s+/i, "").trim();
+      if (!text) return ctx.reply("Usage: /rules set <rules text>");
+      store.data.rules[chatId] = text;
+      store.save();
+      return ctx.reply("Rules saved.");
+    }
+    return ctx.reply(store.data.rules[chatId] ? "Group rules:\n" + store.data.rules[chatId] : "No rules set yet. Admins can set them with /rules set <text>");
+  });
+
+  bot.command("slow", async (ctx) => {
+    if (!(await isAdminUser(ctx))) return ctx.reply("Only administrators can do this.");
+    const args = argText(ctx).trim().toLowerCase();
+    if (args === "off") {
+      try {
+        await ctx.api.setChatSlowMode(ctx.chat.id, 0);
+        return ctx.reply("Slow mode disabled.");
+      } catch {
+        return ctx.reply("I need admin rights to change slow mode.");
+      }
+    }
+    const secs = parseInt(args, 10);
+    if (isNaN(secs) || secs < 1 || secs > 3600) return ctx.reply("Usage: /slow <seconds> (max 3600) | off");
+    try {
+      await ctx.api.setChatSlowMode(ctx.chat.id, secs);
+      return ctx.reply(`Slow mode set to ${secs} seconds.`);
+    } catch {
+      return ctx.reply("I need admin rights to change slow mode.");
     }
   });
 }

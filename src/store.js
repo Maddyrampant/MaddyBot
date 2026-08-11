@@ -12,6 +12,14 @@ function newUserData() {
     birthday: null,
     reminders: [],
     gameStats: {},
+    expenses: [],
+    budget: 0,
+    water: { date: "", ml: 0 },
+    moodLog: [],
+    worklog: [],
+    meetings: [],
+    habits: [],
+    contacts: [],
   };
 }
 

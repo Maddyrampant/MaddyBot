@@ -108,6 +108,51 @@ export default function register(bot, { memory }) {
     memory.clear(userIdFrom(ctx));
     await ctx.reply("Your chat memory was cleared.");
   });
+
+  reg("analyze", { desc: "Deep analysis of your conversation with Madelin", group: "ai" });
+  reg("mood", { desc: "Detect your mood from the conversation", group: "ai" });
+  reg("summary", { desc: "Summarize the conversation so far", group: "ai" });
+
+  const analysisCommands = {
+    analyze: (t) =>
+      "Analyze this conversation between User and Madelin. Give:\n" +
+      "1) Main topics discussed\n" +
+      "2) The user's mood and hidden needs\n" +
+      "3) What the user really wants from Madelin\n" +
+      "4) A smart suggestion for how to make the conversation more valuable to the user\n" +
+      "Write it clearly in Persian.\n\n" + t,
+    mood: (t) =>
+      "Read this conversation and describe the user's current mood precisely: overall feeling, energy, stress level, and what changed it. " +
+      "Then suggest the best way Madelin can respond right now to help this user feel better. " +
+      "Answer in Persian.\n\n" + t,
+    summary: (t) =>
+      "Summarize this conversation in Persian: who the user is, what was discussed, what was decided, and any important promises or topics to follow up on later. " +
+      "Keep it clear and short.\n\n" + t,
+  };
+
+  for (const [name, build] of Object.entries(analysisCommands)) {
+    bot.command(name, async (ctx) => {
+      const id = userIdFrom(ctx);
+      const history = memory.get(id);
+      if (!history.length) {
+        return ctx.reply("There is no conversation to analyze yet. Talk to me a little first!");
+      }
+      await ctx.replyWithChatAction("typing");
+      try {
+        const transcript = history
+          .map((m) => (m.role === "user" ? "User" : "Madelin") + ": " + m.text)
+          .join("\n");
+        const answer = await singlePrompt(build(transcript));
+        await replyLong(answer)(ctx);
+      } catch (err) {
+        if (err.message === "NO_GEMINI_KEY") {
+          return ctx.reply(setupHint());
+        }
+        console.error(name + " error:", err);
+        await ctx.reply("Something went wrong. Please try again.");
+      }
+    });
+  }
 }
 
 function needTextUsage(name) {

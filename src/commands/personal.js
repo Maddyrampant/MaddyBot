@@ -8,6 +8,9 @@ export default function register(bot, { store }) {
   reg("reminders", { desc: "List active reminders", group: "personal" });
   reg("alias", { usage: "<keyword> = <reply> | del <keyword>", desc: "Custom keyword replies", group: "personal" });
   reg("birthday", { usage: "[YYYY-MM-DD]", desc: "Save or show your birthday", group: "personal" });
+  reg("birthdays", { desc: "All saved birthdays", group: "personal" });
+  reg("friend", { usage: "<name> <phone> | del <n>", desc: "Save a contact", group: "personal" });
+  reg("myfriends", { desc: "Your saved contacts", group: "personal" });
   reg("profile", { desc: "Your bot profile", group: "personal" });
 
   bot.command("todo", (ctx) => {
@@ -41,9 +44,12 @@ export default function register(bot, { store }) {
       return ctx.reply("All tasks cleared.");
     }
     if (!user.todos.length) return ctx.reply("Your task list is empty. Add one with /todo add <task>");
-    const lines = user.todos.map(
-      (t, i) => `${i + 1}. ${t.done ? "\u2705 " : "\u26AA "}${t.text}`
-    );
+    const lines = user.todos.map((t, i) => {
+      const mark = t.done ? "\u2705 " : "\u26AA ";
+      const prio = t.priority ? { high: "\u{1F534}", med: "\u{1F7E1}", low: "\u{1F7E2}" }[t.priority] + " " : "";
+      const dl = t.deadline ? ` (due ${t.deadline})` : "";
+      return `${i + 1}. ${mark}${prio}${t.text}${dl}`;
+    });
     return ctx.reply("Your tasks:\n" + lines.join("\n"));
   });
 
@@ -149,7 +155,61 @@ export default function register(bot, { store }) {
         `Notes: ${user.notes.length}\n` +
         `Aliases: ${Object.keys(user.aliases).length}\n` +
         `Reminders: ${user.reminders.length}\n` +
+        `Contacts: ${user.contacts.length}\n` +
+        `Habits: ${user.habits.length}\n` +
         `Tone: ${s.tone}`
+    );
+  });
+
+  bot.command("birthdays", (ctx) => {
+    const entries = [];
+    for (const user of Object.values(store.data.users || {})) {
+      if (user.birthday) {
+        const d = new Date(user.birthday);
+        const today = new Date();
+        const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+        const days = Math.round((next - today) / (24 * 60 * 60 * 1000));
+        entries.push({ user, days, d });
+      }
+    }
+    if (!entries.length) return ctx.reply("No birthdays saved yet. Save yours with /birthday YYYY-MM-DD");
+    entries.sort((a, b) => a.days - b.days);
+    return ctx.reply(
+      "Saved birthdays:\n" +
+        entries
+          .map(
+            (e) =>
+              `${e.user.name || e.user.id}: ${e.d.toLocaleDateString("en-GB")}${e.days >= 0 ? ` — in ${e.days} day(s)` : ""}`
+          )
+          .join("\n")
+    );
+  });
+
+  bot.command("friend", (ctx) => {
+    const user = store.getUser(ctx.from.id);
+    const args = argText(ctx);
+    const parts = args.split(/\s+/);
+    const sub = (parts[0] || "").toLowerCase();
+    if (sub === "del") {
+      const n = parseInt(parts[1], 10);
+      if (!n || !user.contacts[n - 1]) return ctx.reply("Invalid index.");
+      user.contacts.splice(n - 1, 1);
+      store.save();
+      return ctx.reply("Contact deleted.");
+    }
+    if (!args || parts.length < 2) return ctx.reply("Usage: /friend <name> <phone> | del <n>");
+    const phone = parts[parts.length - 1];
+    const name = parts.slice(0, -1).join(" ");
+    user.contacts.push({ id: uid(), name, phone });
+    store.save();
+    return ctx.reply(`Contact saved: ${name} (${phone})`);
+  });
+
+  bot.command("myfriends", (ctx) => {
+    const user = store.getUser(ctx.from.id);
+    if (!user.contacts.length) return ctx.reply("No contacts saved. Add one with /friend <name> <phone>");
+    return ctx.reply(
+      "Your contacts:\n" + user.contacts.map((c, i) => `${i + 1}. ${c.name} — ${c.phone}`).join("\n")
     );
   });
 }
