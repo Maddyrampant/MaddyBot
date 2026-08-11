@@ -1,12 +1,14 @@
 # MaddyBot
 
-A multi-purpose Telegram assistant with 100+ commands: chat, translation, text tools, math, weather, QR codes, games, reminders, and group moderation.
+A multi-purpose Telegram assistant with 100+ commands: chat, translation, text tools, math, weather, QR codes, games, reminders, group moderation, and an **autonomous agent** that can search the web, browse pages, call APIs, and (for the owner) run shell commands.
 
 ## Features
 
 - **Conversation with memory** — per-user chat history, so the bot remembers the context of your conversation.
+- **Long-term memory** — remembers facts about you with semantic search (SQLite + embeddings), rolling conversation summaries, and automatic fact extraction from your chats.
+- **Autonomous agent** — `/agent` can plan and execute multi-step tasks using tools (web search, page fetch, headless browser, API calls), plus owner-only tools (shell, files, apps).
 - **First-user companion** — the first person to message the bot becomes its parent; the bot introduces itself as a little girl and can be taught facts that it remembers and uses later.
-- **100+ commands** — organized into ten categories.
+- **100+ commands** — organized into categories.
 - **No extra API keys required** for most tools — weather, currency, IP lookup, DNS, WHOIS, memes, cat/dog photos, URL shortener, and geocoding use free public services.
 - **QR code generation** — done locally with no external service.
 - **Games** — number guessing, rock-paper-scissors, tic-tac-toe, hangman, trivia quiz, word unscramble, memory sequence, and a group counting game.
@@ -30,6 +32,7 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/version` | Bot version |
 | `/ping` | Latency check |
 | `/settings` | Show your settings |
+| `/status` | Bot and system status |
 | `/feedback <text>` | Send feedback |
 | `/report <text>` | Report an issue |
 
@@ -39,6 +42,11 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | --- | --- |
 | `/ask <question>` | Chat with the assistant |
 | `/reset` | Clear your chat memory |
+| `/remember <fact>` | Save a long-term memory |
+| `/memories [count]` | List your saved memories |
+| `/forget <id>` | Delete a saved memory by id |
+| `/forgetall` | Delete all your memories |
+| `/forgetchat` | Reset chat history and summaries |
 | `/translate <lang> <text>` | Translate text |
 | `/summarize <text>` | Summarize text |
 | `/grammar <text>` | Fix grammar and spelling |
@@ -112,7 +120,10 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | --- | --- |
 | `/weather <city>` | Current weather for a city |
 | `/currency <amount> <from> <to>` | Exchange rate |
-| `/shorten <url>` | Shorten a URL |
+| `/shorturl <url>` | Shorten a URL |
+| `/search <query>` | Search the web |
+| `/fetch <url>` | Read a web page as text |
+| `/browse <url>` | Open a page in a browser and read its text |
 | `/qr <text>` | Generate a QR code image |
 | `/http <url>` | Check a website's HTTP status |
 | `/ip` | Your public IP address |
@@ -120,6 +131,14 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/whois <domain>` | WHOIS info for a domain |
 | `/dns <host>` | DNS records for a host |
 | `/geo <query>` | Geocode a location |
+
+### Agent & Dev
+
+| Command | Description |
+| --- | --- |
+| `/agent <task>` | Autonomous agent: searches, browses and calls APIs to complete a task |
+| `/run <command>` | Run a shell command (owner only) |
+| `/api <method> <url> [body]` | Call an API (POST/PUT/PATCH/DELETE owner only) |
 
 ### Fun
 
@@ -189,10 +208,11 @@ cd MaddyBot
 
 # 2. Install dependencies
 npm install
+npx playwright install chromium   # needed only for /browse and the browse tool
 
 # 3. Create your configuration file
 cp .env.example .env
-# then fill in BOT_TOKEN and GEMINI_API_KEY
+# then fill in BOT_TOKEN, GEMINI_API_KEY and OWNER_ID (your Telegram ID, from /id)
 
 # 4. Run the bot
 npm start
@@ -206,8 +226,25 @@ The `.env` file holds your secrets and is not committed to the repository. The r
 | --- | --- | --- |
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather |
 | `GEMINI_API_KEY` | Yes | Google Gemini API key |
-| `GEMINI_MODEL` | No | Model name (default: `gemini-2.0-flash`) |
-| `OWNER_ID` | No | Your Telegram user ID, always treated as admin in groups |
+| `GEMINI_MODEL` | No | Model name (default: `gemini-3.5-flash`) |
+| `EMBED_MODEL` | No | Embedding model for memory search (default: `gemini-embedding-001`) |
+| `OWNER_ID` | No | Your Telegram user ID. Enables owner-only tools (shell, files, apps) |
+| `DB_FILE` | No | SQLite database path (default: `data/maddy.db`) |
+| `AGENT_ENABLED` | No | Set to `false` to disable the agent entirely |
+| `AGENT_TIMEOUT` | No | Agent request timeout in ms (default `120000`) |
+| `BROWSER_TIMEOUT` | No | Headless browser timeout in ms (default `30000`) |
+| `MAX_AGENT_ROUNDS` | No | Max tool rounds per agent run (default `5`) |
+
+## The Agent
+
+The `/agent` command runs an autonomous loop. For everyone it exposes safe tools
+(web search, page fetch, headless browser, read-only API calls, saving memories).
+When `OWNER_ID` is set, the owner additionally gets:
+
+- `/run` and the `shell` tool — execute commands on the host machine
+- `read_file` / `write_file` / `list_dir` — file access
+- `open_app` — open applications on the host
+- `api_call` with POST/PUT/PATCH/DELETE
 
 ## Usage in Groups
 
@@ -222,6 +259,7 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 
 ```
 ├── index.js                 # entry point, registers all modules
+├── ecosystem.config.cjs     # PM2 process config
 ├── src/
 │   ├── commands/            # command handlers grouped by category
 │   │   ├── core.js          # general and info commands
@@ -233,11 +271,16 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 │   │   ├── fun.js           # fun and media commands
 │   │   ├── games.js         # interactive games
 │   │   ├── personal.js      # todos, notes, reminders, aliases
-│   │   └── group.js         # group moderation
+│   │   ├── group.js         # group moderation
+│   │   ├── agent.js         # /agent, /run, /api, /search, /fetch, /browse
+│   │   └── memory.js        # /remember, /memories, /forget, /status
 │   ├── config.js            # environment configuration
-│   ├── ai.js                # Gemini client wrapper
+│   ├── ai.js                # Gemini client wrapper (chat + embeddings)
+│   ├── agent.js             # autonomous tool-calling loop
+│   ├── tools.js             # agent tool registry (web, shell, files, APIs)
+│   ├── db.js                # SQLite database (better-sqlite3)
+│   ├── memory.js            # long-term memory: semantic search, summaries, facts
 │   ├── store.js             # JSON data store for users and chats
-│   ├── memory.js            # per-user chat memory
 │   ├── http.js              # HTTP helpers with timeouts
 │   ├── utils.js             # shared helpers and command registry
 │   ├── games.js             # in-memory game sessions

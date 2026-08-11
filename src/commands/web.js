@@ -15,7 +15,7 @@ const WCODE = {
 export default function register(bot) {
   reg("weather", { usage: "<city>", desc: "Current weather for a city", group: "web" });
   reg("currency", { usage: "<amount> <from> <to>", desc: "Exchange rate (ECB rates)", group: "web" });
-  reg("shorten", { usage: "<url>", desc: "Shorten a URL", group: "web" });
+  reg("shorturl", { usage: "<url>", desc: "Shorten a URL", group: "web" });
   reg("qr", { usage: "<text>", desc: "Generate a QR code image", group: "web" });
   reg("http", { usage: "<url>", desc: "Check a website's HTTP status", group: "web" });
   reg("ip", { desc: "Your public IP address", group: "web" });
@@ -72,9 +72,9 @@ export default function register(bot) {
     }
   });
 
-  bot.command("shorten", async (ctx) => {
+  bot.command("shorturl", async (ctx) => {
     const url = argText(ctx);
-    if (!/^https?:\/\//i.test(url)) return ctx.reply("Usage: /shorten https://example.com/page");
+    if (!/^https?:\/\//i.test(url)) return ctx.reply("Usage: /shorturl https://example.com/page");
     await ctx.replyWithChatAction("typing");
     try {
       const data = await getJSON(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);

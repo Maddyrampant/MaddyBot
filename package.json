@@ -19,9 +19,12 @@
   "license": "MIT",
   "dependencies": {
     "@google/genai": "^1.9.0",
+    "better-sqlite3": "^13.0.3",
     "dotenv": "^16.4.7",
     "figlet": "^1.8.0",
     "grammy": "^1.30.0",
+    "node-html-parser": "^9.0.1",
+    "playwright": "^1.62.1",
     "qrcode": "^1.5.4"
   }
 }

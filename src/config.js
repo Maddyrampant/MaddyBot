@@ -5,6 +5,11 @@ const config = {
   geminiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
   ownerId: Number(process.env.OWNER_ID || 0),
+  agentEnabled: process.env.AGENT_ENABLED !== "false",
+  agentTimeout: Number(process.env.AGENT_TIMEOUT || 120000),
+  browserTimeout: Number(process.env.BROWSER_TIMEOUT || 30000),
+  fetchTimeout: Number(process.env.FETCH_TIMEOUT || 15000),
+  maxAgentRounds: Number(process.env.MAX_AGENT_ROUNDS || 5),
 };
 
 export function validate() {
@@ -17,6 +22,9 @@ export function validate() {
   }
   if (!config.geminiKey) {
     console.warn("GEMINI_API_KEY is not set. Chat and AI commands will show a setup hint until you add it.");
+  }
+  if (!config.ownerId) {
+    console.warn("OWNER_ID is not set. System tools (shell, files, apps) are disabled until you add your Telegram ID.");
   }
   return true;
 }

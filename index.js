@@ -1,9 +1,10 @@
 import config, { validate } from "./src/config.js";
-import { initAI, chat } from "./src/ai.js";
-import { MemoryStore } from "./src/memory.js";
+import { initAI, chat, CHAT_SYSTEM } from "./src/ai.js";
+import { MemoryStore, buildContext, addMessage, extractFacts } from "./src/memory.js";
 import { Store } from "./src/store.js";
 import { startScheduler } from "./src/scheduler.js";
 import { replyLong } from "./src/utils.js";
+import { getDb } from "./src/db.js";
 import { Bot } from "grammy";
 import { isFirstUser, learnFromText, buildChildSystem, getFirstUserCall } from "./src/commands/onboarding.js";
 
@@ -24,8 +25,12 @@ import registerHealth from "./src/commands/health.js";
 import registerKnowledge from "./src/commands/knowledge.js";
 import registerDev from "./src/commands/dev.js";
 import registerExtra from "./src/commands/extra.js";
+import registerAgent from "./src/commands/agent.js";
+import registerMemory from "./src/commands/memory.js";
 
 if (!validate()) process.exit(1);
+
+getDb();
 
 const bot = new Bot(config.botToken);
 initAI();
@@ -52,6 +57,8 @@ registerHealth(bot, deps);
 registerKnowledge(bot);
 registerDev(bot);
 registerExtra(bot);
+registerAgent(bot);
+registerMemory(bot);
 
 startScheduler(bot, store);
 
@@ -108,10 +115,20 @@ async function handleChat(ctx, text) {
   try {
     await ctx.replyWithChatAction("typing");
     memory.push(id, text, "user");
-    const system = isChild ? buildChildSystem(store.data.firstUser) : null;
+    addMessage(id, "user", text);
+    let system = isChild ? buildChildSystem(store.data.firstUser) : CHAT_SYSTEM;
+    const mem = await buildContext(id, text).catch(() => null);
+    if (mem && (mem.facts || mem.summary)) {
+      const extra = [];
+      if (mem.summary) extra.push(`Ongoing conversation summary:\n${mem.summary}`);
+      if (mem.facts) extra.push(`Long-term memories about this person:\n${mem.facts}`);
+      system = (system || "You are Madelin, a smart assistant.") + "\n\n" + extra.join("\n\n");
+    }
     const answer = await chat(text, memory.get(id).slice(0, -1), system);
     if (!answer) throw new Error("empty response");
     memory.push(id, answer, "assistant");
+    addMessage(id, "assistant", answer);
+    void extractFacts(id, [text, answer]);
     await replyLong(answer)(ctx);
   } catch (err) {
     if (err.message === "NO_GEMINI_KEY") {

@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import config from "./config.js";
 
-const CHAT_SYSTEM = `You are Madelin, an extraordinarily intelligent and emotionally aware assistant.
+export const CHAT_SYSTEM = `You are Madelin, an extraordinarily intelligent and emotionally aware assistant.
 
 How you think:
 - Read the conversation with full attention. Notice what the user says AND what they do not say: their tone, mood, doubts and hidden needs.
@@ -64,4 +64,16 @@ export function chat(prompt, history = [], system = CHAT_SYSTEM) {
     { role: "user", parts: [{ text: prompt }] },
   ];
   return generate(contents, system);
+}
+
+export async function embed(text) {
+  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
+  if (!client) initAI();
+  const res = await client.models.embedContent({
+    model: process.env.EMBED_MODEL || "gemini-embedding-001",
+    contents: String(text).slice(0, 8000),
+  });
+  const vals = res.embeddings && res.embeddings[0] && res.embeddings[0].values;
+  if (!vals) throw new Error("EMBED_EMPTY");
+  return Float32Array.from(vals);
 }

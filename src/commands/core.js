@@ -1,4 +1,4 @@
-import { reg, registry, argText, replyLong, allGroups, commandsByGroup, groupLabel } from "../utils.js";
+import { reg, registry, argText, replyLong, allGroups, commandsByGroup, groupLabel, escapeHtml } from "../utils.js";
 
 const bootTime = Date.now();
 
@@ -43,7 +43,7 @@ export default function register(bot, { store }) {
       if (!cmds.length) continue;
       if (targetGroup && key !== targetGroup) continue;
       out += `<b>${groupLabel(key)}</b>\n`;
-      out += cmds.map((c) => `/${c.name}${c.usage ? " <i>" + c.usage + "</i>" : ""}`).join(" · ");
+      out += cmds.map((c) => `/${c.name}${c.usage ? " <i>" + escapeHtml(c.usage) + "</i>" : ""}`).join(" · ");
       out += "\n\n";
     }
     out += "Tip: /help <command> shows details for one command.";
