@@ -15,6 +15,8 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 - **Personal tools** — to-do lists, notes, reminders, custom keyword replies, and birthday tracking.
 - **Group moderation** — welcome messages, kick, ban, mute, and a warning system.
 - **Works in private chats and groups** — in groups the bot replies when mentioned (`@username`) or when its message is replied to.
+- **Button menu** — `/start` and `/commands` open an interactive inline-keyboard menu (categories → commands → details) plus a quick Reply Keyboard under the input bar.
+- **Visual mode (Telegram Mini App)** — a glassmorphism web UI served by the bot itself: dashboard, streaming chat with Madelin, memory browser, and a searchable command catalog. Opened from the bot menu button or `/webapp`.
 
 ## Commands
 
@@ -33,6 +35,7 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/ping` | Latency check |
 | `/settings` | Show your settings |
 | `/status` | Bot and system status |
+| `/webapp` | Open the visual web app (Mini App) |
 | `/feedback <text>` | Send feedback |
 | `/report <text>` | Report an issue |
 
@@ -234,6 +237,27 @@ The `.env` file holds your secrets and is not committed to the repository. The r
 | `AGENT_TIMEOUT` | No | Agent request timeout in ms (default `120000`) |
 | `BROWSER_TIMEOUT` | No | Headless browser timeout in ms (default `30000`) |
 | `MAX_AGENT_ROUNDS` | No | Max tool rounds per agent run (default `5`) |
+| `WEBAPP_ENABLED` | No | Set to `false` to disable the web UI (default `true`) |
+| `WEBAPP_HOST` | No | Web UI bind address (default `127.0.0.1`) |
+| `WEBAPP_PORT` | No | Web UI port (default `8834`) |
+| `WEBAPP_URL` | No | Public URL of the web UI, used for the Telegram menu button (default `http://localhost:8834`) |
+| `WEBAPP_ALLOW_INSECURE` | No | DEV ONLY: set to `true` to open the web UI in a plain browser without Telegram auth |
+
+## Telegram Mini App (visual mode)
+
+The bot hosts a glassmorphism web UI (Persian, RTL) on `http://<WEBAPP_HOST>:<WEBAPP_PORT>`
+using only Node's built-in `http` module — no extra dependencies.
+
+- Telegram **Desktop** can open it directly at `http://localhost:8834`.
+- **Mobile** needs an HTTPS URL. Easy option: `cloudflared tunnel --url http://localhost:8834`,
+  then set `WEBAPP_URL` to the printed `https://…` address and restart the bot.
+- On startup the bot sets its menu button (`type: web_app`) and a curated command list
+  via `setChatMenuButton` / `setMyCommands`, so the app opens straight from the chat menu.
+
+The web UI is a single page with four views: **dashboard** (status), **chat** (streaming AI
+replies), **memory** (browse/delete long-term memories), and **commands** (searchable catalog).
+All API calls are authenticated with Telegram's `initData` (HMAC-SHA256 validation,
+24h `auth_date` window).
 
 ## The Agent
 
@@ -275,7 +299,9 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 │   │   ├── agent.js         # /agent, /run, /api, /search, /fetch, /browse
 │   │   └── memory.js        # /remember, /memories, /forget, /status
 │   ├── config.js            # environment configuration
-│   ├── ai.js                # Gemini client wrapper (chat + embeddings)
+│   ├── ai.js                # Gemini client wrapper (chat + embeddings + streaming)
+│   ├── menu.js              # inline-keyboard menu router + reply keyboard
+│   ├── webapp.js            # web UI server: static files + JSON API + initData auth
 │   ├── agent.js             # autonomous tool-calling loop
 │   ├── tools.js             # agent tool registry (web, shell, files, APIs)
 │   ├── db.js                # SQLite database (better-sqlite3)
@@ -285,6 +311,10 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 │   ├── utils.js             # shared helpers and command registry
 │   ├── games.js             # in-memory game sessions
 │   └── scheduler.js         # background reminders loop
+├── public/                  # Mini App frontend (served by src/webapp.js)
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
 └── data/                    # runtime data (created at runtime, ignored by git)
 ```
 

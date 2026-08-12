@@ -66,6 +66,40 @@ export function chat(prompt, history = [], system = CHAT_SYSTEM) {
   return generate(contents, system);
 }
 
+export async function* generateStream(contents, system = TASK_SYSTEM, extra = {}) {
+  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
+  if (!client) initAI();
+  const res = await client.models.generateContentStream({
+    model: config.model,
+    contents,
+    systemInstruction: system,
+    ...extra,
+  });
+  let prev = "";
+  for await (const chunk of res) {
+    const t = chunk.text || "";
+    if (!t) continue;
+    if (prev === "" || !t.startsWith(prev)) {
+      yield t;
+    } else {
+      const delta = t.slice(prev.length);
+      if (delta) yield delta;
+    }
+    prev = t;
+  }
+}
+
+export async function* chatStream(prompt, history = [], system = CHAT_SYSTEM) {
+  const contents = [
+    ...history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.text }],
+    })),
+    { role: "user", parts: [{ text: prompt }] },
+  ];
+  yield* generateStream(contents, system);
+}
+
 export async function embed(text) {
   if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
   if (!client) initAI();

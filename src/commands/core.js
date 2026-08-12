@@ -1,4 +1,5 @@
-import { reg, registry, argText, replyLong, allGroups, commandsByGroup, groupLabel, escapeHtml, cmdDesc } from "../utils.js";
+import { reg, registry, argText, allGroups, groupLabel } from "../utils.js";
+import { mainMenu, groupMenu, cmdView, replyKeyboard, MAIN_TEXT, showMain } from "../menu.js";
 
 const bootTime = Date.now();
 
@@ -20,45 +21,32 @@ export default function register(bot, { store }) {
     await ctx.reply(
       "سلام! من مادی‌بات هستم 🤖\n" +
         "می‌تونم گفتگو کنم، ترجمه کنم، QR بسازم، بازی کنم، آب‌وهوا رو بگم و کلی کار دیگه.\n" +
-        "برای دیدن همهٔ فرمان‌ها <code>/commands</code> رو بفرست.",
-      { parse_mode: "HTML" }
+        "از دکمه‌های زیر یا Reply Keyboard برای پیمایش استفاده کن.",
+      { parse_mode: "HTML", reply_markup: mainMenu(0) }
     );
+    await ctx.reply("دکمه‌های سریع برای دسترسی راحت‌تر 👇", { reply_markup: replyKeyboard() });
   });
 
   bot.command(["help", "commands"], async (ctx) => {
     const arg = argText(ctx).trim().replace(/^\//, "");
-    let targetGroup = "";
 
     if (arg) {
       const meta = registry[arg];
       if (meta) {
-        return ctx.reply(
-          `/<b>${meta.name}</b>${meta.usage ? " " + escapeHtml(meta.usage) : ""}\n${cmdDesc(arg)}\nگروه: ${groupLabel(meta.group)}`,
-          { parse_mode: "HTML" }
-        );
+        const view = cmdView(arg);
+        return ctx.reply(view.text, { parse_mode: "HTML", reply_markup: view.kb });
       }
       const isGroup = allGroups().some(([k]) => k === arg);
       if (isGroup) {
-        targetGroup = arg;
-      } else {
-        return ctx.reply("فرمان ناشناخته: /" + arg);
+        return ctx.reply(`<b>${groupLabel(arg)}</b>\nدستوری را انتخاب کنید.`, {
+          parse_mode: "HTML",
+          reply_markup: groupMenu(arg, 0),
+        });
       }
+      return ctx.reply("فرمان ناشناخته: /" + arg);
     }
 
-    let out = "<b>🤖 منوی ربات</b>\n";
-    out += "برای توضیح هر فرمان: <code>/help name</code> یا <code>/commands group</code>\n\n";
-    for (const [key] of allGroups()) {
-      const cmds = commandsByGroup(key);
-      if (!cmds.length) continue;
-      if (targetGroup && key !== targetGroup) continue;
-      out += `<b>${groupLabel(key)}</b>\n`;
-      out += cmds
-        .map((c) => `/${c.name}${c.usage ? " <i>" + escapeHtml(c.usage) + "</i>" : ""}`)
-        .join(" · ");
-      out += "\n\n";
-    }
-    out += "💡 نکته: <code>/help name</code> توضیح فارسی هر فرمان را نشان می‌دهد.";
-    await replyLong(out, { parse_mode: "HTML" })(ctx);
+    return ctx.reply(MAIN_TEXT, { parse_mode: "HTML", reply_markup: mainMenu(0) });
   });
 
   bot.command("id", async (ctx) => {

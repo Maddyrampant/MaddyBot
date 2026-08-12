@@ -44,10 +44,10 @@ export default function register(bot, { store }) {
     );
   });
 
-  bot.on("callback_query:data", async (ctx) => {
+  bot.on("callback_query:data", async (ctx, next) => {
     const data = ctx.callbackQuery.data;
     if (!data.startsWith("g:")) {
-      return ctx.answerCallbackQuery();
+      return next();
     }
     const pending = store.data.pendingFirstUser;
     if (!pending || pending.id !== ctx.from.id) {

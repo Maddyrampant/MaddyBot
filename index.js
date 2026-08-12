@@ -27,6 +27,9 @@ import registerDev from "./src/commands/dev.js";
 import registerExtra from "./src/commands/extra.js";
 import registerAgent from "./src/commands/agent.js";
 import registerMemory from "./src/commands/memory.js";
+import registerWebapp, { sendWebapp } from "./src/commands/webapp.js";
+import { registerMenu } from "./src/menu.js";
+import { startWebApp } from "./src/webapp.js";
 
 if (!validate()) process.exit(1);
 
@@ -59,6 +62,9 @@ registerDev(bot);
 registerExtra(bot);
 registerAgent(bot);
 registerMemory(bot);
+registerWebapp(bot);
+
+registerMenu(bot, { sendWebapp });
 
 startScheduler(bot, store);
 
@@ -150,5 +156,34 @@ bot.catch((err) => {
 process.on("SIGINT", () => process.exit(0));
 process.on("SIGTERM", () => process.exit(0));
 
+async function setupWebApp() {
+  if (!config.webappEnabled) return;
+  try {
+    startWebApp({ store, memory });
+  } catch (err) {
+    console.error("WebApp failed to start:", err.message);
+  }
+  try {
+    await bot.api.setChatMenuButton({
+      menuButton: { type: "web_app", text: "🌐 وباپ", web_app: { url: config.webappUrl } },
+    });
+    await bot.api.setMyCommands([
+      { command: "start", description: "صفحه اصلی و منو" },
+      { command: "webapp", description: "نسخه تصویری (وباپ)" },
+      { command: "ask", description: "گفتگو با دستیار" },
+      { command: "commands", description: "لیست همه فرمان‌ها" },
+      { command: "help", description: "راهنما" },
+      { command: "weather", description: "آب‌وهوا" },
+      { command: "qr", description: "ساخت QR" },
+      { command: "translate", description: "ترجمه" },
+      { command: "todo", description: "کارهای من" },
+      { command: "memories", description: "خاطرات من" },
+    ]);
+  } catch (err) {
+    console.error("setChatMenuButton/setMyCommands failed:", err.message);
+  }
+}
+
 bot.start();
+setupWebApp();
 console.log("MaddyBot is running...");

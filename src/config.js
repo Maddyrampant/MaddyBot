@@ -10,6 +10,13 @@ const config = {
   browserTimeout: Number(process.env.BROWSER_TIMEOUT || 30000),
   fetchTimeout: Number(process.env.FETCH_TIMEOUT || 15000),
   maxAgentRounds: Number(process.env.MAX_AGENT_ROUNDS || 5),
+  webappEnabled: process.env.WEBAPP_ENABLED !== "false",
+  webappHost: process.env.WEBAPP_HOST || "127.0.0.1",
+  webappPort: Number(process.env.WEBAPP_PORT || 8834),
+  webappUrl:
+    process.env.WEBAPP_URL ||
+    `http://localhost:${Number(process.env.WEBAPP_PORT || 8834)}`,
+  webappAllowInsecure: process.env.WEBAPP_ALLOW_INSECURE === "true",
 };
 
 export function validate() {
