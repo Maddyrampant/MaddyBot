@@ -323,9 +323,9 @@ export default function register(bot) {
 
   bot.on("message:photo", onPhoto);
 
-  bot.on("message:document", (ctx) => {
+  bot.on("message:document", (ctx, next) => {
     const doc = ctx.message && ctx.message.document;
-    if (!doc || !/^image\//i.test(doc.mime_type || "")) return;
+    if (!doc || !/^image\//i.test(doc.mime_type || "")) return next();
     return onPhoto(ctx);
   });
 

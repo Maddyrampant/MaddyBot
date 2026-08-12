@@ -100,6 +100,88 @@ export async function* chatStream(prompt, history = [], system = CHAT_SYSTEM) {
   yield* generateStream(contents, system);
 }
 
+export async function generateWithMedia(prompt, media = [], system = TASK_SYSTEM, model = config.model) {
+  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
+  if (!client) initAI();
+  const parts = [{ text: prompt }];
+  for (const m of media) {
+    parts.push({ inlineData: { mimeType: m.mimeType, data: m.data } });
+  }
+  const res = await client.models.generateContent({
+    model,
+    contents: [{ role: "user", parts }],
+    systemInstruction: system,
+  });
+  return (res.text || "").trim();
+}
+
+export async function transcribeAudio(buffer, mimeType = "audio/ogg") {
+  const text = await generateWithMedia(
+    "Transcribe this audio exactly. If it contains Persian, write the transcript in Persian; otherwise in the language being spoken. Return only the transcript text with no commentary.",
+    [{ mimeType, data: buffer.toString("base64") }]
+  );
+  if (!text) throw new Error("EMPTY_RESPONSE");
+  return text;
+}
+
+export async function extractTextFromMedia(buffer, mimeType = "application/pdf") {
+  const text = await generateWithMedia(
+    "Extract ALL text from this document (PDF, Word, scanned page or image). Preserve the original language, headings and structure. If there is no readable text, reply exactly: NO_TEXT",
+    [{ mimeType, data: buffer.toString("base64") }]
+  );
+  if (!text || text === "NO_TEXT") throw new Error("NO_TEXT");
+  return text;
+}
+
+export async function textToSpeech(text) {
+  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
+  if (!client) initAI();
+  const model = config.ttsModel || "gemini-2.5-flash-preview-tts";
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const parseRetryMs = (err) => {
+    try {
+      const j = JSON.parse(err.message);
+      const info = j && j.error;
+      const ri = info && info.details && info.details.find((d) => d["@type"] === "google.rpc.RetryInfo");
+      if (ri && ri.retryDelay) {
+        const s = parseFloat(ri.retryDelay);
+        if (s > 0) return Math.min(s * 1000, 30000);
+      }
+    } catch {}
+    return 0;
+  };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await client.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: String(text) }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: config.ttsVoice || "Kore" } },
+          },
+        },
+      });
+      const cand = res.candidates && res.candidates[0];
+      const part = cand && cand.content && cand.content.parts && cand.content.parts.find((p) => p.inlineData && p.inlineData.data);
+      if (!part || !part.inlineData.data) throw new Error("TTS_EMPTY");
+      return {
+        buffer: Buffer.from(part.inlineData.data, "base64"),
+        mimeType: part.inlineData.mimeType || "audio/ogg",
+      };
+    } catch (err) {
+      const wait = parseRetryMs(err);
+      const isFlakyText = /only be used for TTS/i.test(err.message || "");
+      const isEmpty = err.message === "TTS_EMPTY";
+      if (attempt < 2 && (wait > 0 || isFlakyText || isEmpty)) {
+        await sleep(wait > 0 ? wait : 2000);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export async function embed(text) {
   if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
   if (!client) initAI();

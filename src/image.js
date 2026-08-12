@@ -188,6 +188,18 @@ async function runLocal(input, out, filters, encode) {
   await runFfmpeg(args);
 }
 
+export async function runFFmpeg(args, timeoutMs = 90000) {
+  return runFfmpeg(args, timeoutMs);
+}
+
+export function tmpPathFor(ext) {
+  return tmpPath(ext);
+}
+
+export async function ensureTmpDir() {
+  return ensureTmp();
+}
+
 /**
  * Apply a local (offline, ffmpeg) image operation.
  * @param {string} input  path to source image
@@ -517,6 +529,10 @@ async function downloadFileId(ctx, fileId, ext, mime) {
   const file = await ctx.getFile(fileId);
   await file.download(out);
   return { path: out, ext: ext || "jpg", mime: mime || "image/jpeg" };
+}
+
+export async function downloadFile(ctx, fileId, ext, mime) {
+  return downloadFileId(ctx, fileId, ext, mime);
 }
 
 export async function getPhotoFrom(ctx) {

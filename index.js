@@ -31,6 +31,10 @@ import registerMemory from "./src/commands/memory.js";
 import registerWebapp, { sendWebapp } from "./src/commands/webapp.js";
 import registerDownload from "./src/commands/download.js";
 import registerImage from "./src/commands/image.js";
+import registerVoice from "./src/commands/voice.js";
+import registerDocs from "./src/commands/docs.js";
+import registerPayments from "./src/commands/payments.js";
+import registerDigest from "./src/commands/digest.js";
 import registerAdmin from "./src/commands/admin.js";
 import { registerMenu } from "./src/menu.js";
 import { startWebApp } from "./src/webapp.js";
@@ -70,6 +74,10 @@ registerMemory(bot);
 registerWebapp(bot);
 registerDownload(bot);
 registerImage(bot);
+registerVoice(bot, deps);
+registerDocs(bot);
+registerPayments(bot, deps);
+registerDigest(bot, deps);
 registerAdmin(bot);
 
 registerMenu(bot, { sendWebapp });
@@ -170,7 +178,7 @@ process.on("SIGTERM", () => process.exit(0));
 async function setupWebApp() {
   if (!config.webappEnabled) return;
   try {
-    startWebApp({ store, memory });
+    startWebApp({ store, memory, bot });
   } catch (err) {
     console.error("WebApp failed to start:", err.message);
   }

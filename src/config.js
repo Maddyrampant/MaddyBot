@@ -5,6 +5,8 @@ const config = {
   geminiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
   imageModel: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
+  ttsModel: process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts",
+  ttsVoice: process.env.GEMINI_TTS_VOICE || "Kore",
   ownerId: Number(process.env.OWNER_ID || 0),
   agentEnabled: process.env.AGENT_ENABLED !== "false",
   agentTimeout: Number(process.env.AGENT_TIMEOUT || 120000),
@@ -18,6 +20,9 @@ const config = {
     process.env.WEBAPP_URL ||
     `http://localhost:${Number(process.env.WEBAPP_PORT || 8834)}`,
   webappAllowInsecure: process.env.WEBAPP_ALLOW_INSECURE === "true",
+  webhookEnabled: process.env.WEBHOOK_ENABLED === "true",
+  webhookToken: process.env.WEBHOOK_TOKEN || "",
+  redisUrl: process.env.REDIS_URL || "",
 };
 
 export function validate() {

@@ -672,12 +672,37 @@ async function handleImageAI(req, res, action) {
   }
 }
 
-export function startWebApp({ memory, store }) {
+async function handleWebhook(req, res, bot) {
+  if (!config.webhookEnabled || !config.webhookToken) return json(res, 403, { ok: false, error: "disabled" });
+  const token = req.headers["x-webhook-token"];
+  if (!token || token !== config.webhookToken) return json(res, 403, { ok: false, error: "forbidden" });
+  if (!bot) return json(res, 500, { ok: false, error: "no_bot" });
+  let body;
+  try {
+    body = JSON.parse(await readBody(req, 100_000));
+  } catch {
+    return json(res, 400, { ok: false, error: "bad_body" });
+  }
+  const chatId = Number(body.chatId);
+  const text = String(body.text || "").trim();
+  if (!chatId || !text) return json(res, 400, { ok: false, error: "bad_params" });
+  try {
+    await bot.api.sendMessage(chatId, text);
+    return json(res, 200, { ok: true });
+  } catch (err) {
+    return json(res, 400, { ok: false, error: String(err.message || err).slice(0, 200) });
+  }
+}
+
+export function startWebApp({ memory, store, bot }) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      if (pathname === "/api/webhook" && req.method === "POST") {
+        return handleWebhook(req, res, bot);
+      }
       const isGameAuth = pathname === "/api/game/score" || pathname === "/api/game/top";
       const user = isGameAuth ? authGameRequest(req) : authUser(req);
       if (!user) return json(res, 401, { ok: false, error: "unauthorized" });
