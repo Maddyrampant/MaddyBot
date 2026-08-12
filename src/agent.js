@@ -2,7 +2,7 @@ import config from "./config.js";
 import { getAI, initAI } from "./ai.js";
 import { registry as toolRegistry } from "./tools.js";
 
-export const AGENT_SYSTEM = `You are Madelin, an autonomous assistant that can take real actions using tools.
+export const AGENT_SYSTEM = `You are Madellin, an autonomous assistant that can take real actions using tools.
 
 How to work:
 - Break the user's request into steps and call tools one at a time, waiting for each result.

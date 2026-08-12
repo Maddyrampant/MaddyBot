@@ -4,6 +4,7 @@ const config = {
   botToken: process.env.BOT_TOKEN,
   geminiKey: process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  imageModel: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
   ownerId: Number(process.env.OWNER_ID || 0),
   agentEnabled: process.env.AGENT_ENABLED !== "false",
   agentTimeout: Number(process.env.AGENT_TIMEOUT || 120000),

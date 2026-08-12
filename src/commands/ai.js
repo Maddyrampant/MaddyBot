@@ -109,21 +109,21 @@ export default function register(bot, { memory }) {
     await ctx.reply("Your chat memory was cleared.");
   });
 
-  reg("analyze", { desc: "Deep analysis of your conversation with Madelin", group: "ai" });
+  reg("analyze", { desc: "Deep analysis of your conversation with Madellin", group: "ai" });
   reg("mood", { desc: "Detect your mood from the conversation", group: "ai" });
   reg("summary", { desc: "Summarize the conversation so far", group: "ai" });
 
   const analysisCommands = {
     analyze: (t) =>
-      "Analyze this conversation between User and Madelin. Give:\n" +
+      "Analyze this conversation between User and Madellin. Give:\n" +
       "1) Main topics discussed\n" +
       "2) The user's mood and hidden needs\n" +
-      "3) What the user really wants from Madelin\n" +
+      "3) What the user really wants from Madellin\n" +
       "4) A smart suggestion for how to make the conversation more valuable to the user\n" +
       "Write it clearly in Persian.\n\n" + t,
     mood: (t) =>
       "Read this conversation and describe the user's current mood precisely: overall feeling, energy, stress level, and what changed it. " +
-      "Then suggest the best way Madelin can respond right now to help this user feel better. " +
+      "Then suggest the best way Madellin can respond right now to help this user feel better. " +
       "Answer in Persian.\n\n" + t,
     summary: (t) =>
       "Summarize this conversation in Persian: who the user is, what was discussed, what was decided, and any important promises or topics to follow up on later. " +
@@ -140,7 +140,7 @@ export default function register(bot, { memory }) {
       await ctx.replyWithChatAction("typing");
       try {
         const transcript = history
-          .map((m) => (m.role === "user" ? "User" : "Madelin") + ": " + m.text)
+          .map((m) => (m.role === "user" ? "User" : "Madellin") + ": " + m.text)
           .join("\n");
         const answer = await singlePrompt(build(transcript));
         await replyLong(answer)(ctx);

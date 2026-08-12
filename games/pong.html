@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🏓 Pong</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  canvas { background: #0d1526; border: 2px solid rgba(255,255,255,.14); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); touch-action: none; width: min(94vw, 460px); }
+  .hint { margin-top: 12px; font-size: 12px; color: #8b97ad; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.86); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 40px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { margin-top: 6px; padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hint">🎮 برد اول بازی با ۷ امتیاز — ماوس/لمس یا کلیدهای W/S</div>
+
+  <div id="overlay">
+    <h2 id="oTitle">🏓 تمام شد!</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "pong";
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const W = 460, H = 300;
+canvas.width = W; canvas.height = H;
+
+let player, ai, ball, playerScore, aiScore, over, anim, target;
+
+function reset() {
+  player = { x: 12, y: H / 2 - 35, w: 10, h: 70 };
+  ai = { x: W - 22, y: H / 2 - 35, w: 10, h: 70 };
+  ball = { x: W / 2, y: H / 2, vx: 3.2 * (Math.random() < .5 ? 1 : -1), vy: (Math.random() * 2 - 1) * 2.4, r: 7 };
+  playerScore = 0; aiScore = 0;
+  over = false;
+  target = ai;
+  document.getElementById("overlay").classList.remove("show");
+  cancelAnimationFrame(anim);
+  loop();
+}
+
+function serve() {
+  ball = { x: W / 2, y: H / 2, vx: 3.2 * (Math.random() < .5 ? 1 : -1), vy: (Math.random() * 2 - 1) * 2.4, r: 7 };
+}
+
+function draw() {
+  ctx.fillStyle = "#0d1526"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.setLineDash([6, 8]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2, 8); ctx.lineTo(W / 2, H - 8); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#3ee08a"; ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.fillStyle = "#ff6b6b"; ctx.fillRect(ai.x, ai.y, ai.w, ai.h);
+  ctx.fillStyle = "#ffd166"; ctx.shadowColor = "#ffd166"; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.font = "bold 26px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#e8edf5";
+  ctx.fillText(playerScore, W * .25, 34);
+  ctx.fillText(aiScore, W * .75, 34);
+}
+
+function update() {
+  if (over) return;
+  if (playerScore >= 7 || aiScore >= 7) return;
+
+  ball.x += ball.vx; ball.y += ball.vy;
+  if (ball.y < ball.r || ball.y > H - ball.r) ball.vy *= -1;
+
+  const pd = target === player;
+  const pad = pd ? player : ai;
+  if (ball.x - ball.r < pad.x + pad.w && ball.x + ball.r > pad.x && ball.y > pad.y && ball.y < pad.y + pad.h) {
+    const hit = (ball.y - pad.y) / pad.h - .5;
+    ball.vx = Math.abs(ball.vx) * (pd ? 1 : -1);
+    ball.vy = hit * 5;
+    ball.vx = Math.min(Math.abs(ball.vx) + .3, 8) * (ball.vx > 0 ? 1 : -1);
+  }
+
+  const aiSpeed = 2.6;
+  if (ball.vx > 0 && ball.x > W / 3) {
+    ai.y += ball.y > ai.y + ai.h / 2 ? aiSpeed : -aiSpeed;
+  } else {
+    ai.y += (H / 2 - ai.h / 2 - ai.y) * .03;
+  }
+  ai.y = Math.max(0, Math.min(H - ai.h, ai.y));
+
+  if (ball.x < -20) { aiScore++; serve(); }
+  if (ball.x > W + 20) { playerScore++; serve(); }
+
+  if (playerScore >= 7 || aiScore >= 7) gameOver();
+}
+
+function loop() {
+  update(); draw();
+  anim = requestAnimationFrame(loop);
+}
+
+function mouseTarget() {
+  return ball.vx < 0 ? player : ai;
+}
+
+canvas.addEventListener("mousemove", e => {
+  const r = canvas.getBoundingClientRect();
+  const y = (e.clientY - r.top) * (H / r.height);
+  target = mouseTarget();
+  target.y = y - target.h / 2;
+  target.y = Math.max(0, Math.min(H - target.h, target.y));
+});
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const r = canvas.getBoundingClientRect();
+  const y = (t.clientY - r.top) * (H / r.height);
+  target = mouseTarget();
+  target.y = y - target.h / 2;
+  target.y = Math.max(0, Math.min(H - target.h, target.y));
+}, { passive: false });
+
+window.addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "w" || e.key === "ArrowUp") player.y -= 12;
+  if (e.key.toLowerCase() === "s" || e.key === "ArrowDown") player.y += 12;
+  player.y = Math.max(0, Math.min(H - player.h, player.y));
+});
+
+async function gameOver() {
+  over = true;
+  const won = playerScore >= 7;
+  document.getElementById("oTitle").textContent = won ? "🏆 بردی!" : "🤖 ربات برنده شد!";
+  document.getElementById("oScore").textContent = `${playerScore} - ${aiScore}`;
+  const res = await GameSDK.submit(KEY, playerScore);
+  const top = res.top || [];
+  const el = document.getElementById("boardTop");
+  if (top.length) {
+    el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+      top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+  } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+  document.getElementById("overlay").classList.add("show");
+}
+
+document.getElementById("replay").addEventListener("click", reset);
+GameSDK.expand();
+reset();
+</script>
+</body>
+</html>

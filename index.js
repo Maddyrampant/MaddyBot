@@ -17,6 +17,7 @@ import registerDatetime from "./src/commands/datetime.js";
 import registerWeb from "./src/commands/web.js";
 import registerFun from "./src/commands/fun.js";
 import registerGames from "./src/commands/games.js";
+import registerGame from "./src/commands/game.js";
 import registerPersonal from "./src/commands/personal.js";
 import registerGroup from "./src/commands/group.js";
 import registerProductivity from "./src/commands/productivity.js";
@@ -28,6 +29,9 @@ import registerExtra from "./src/commands/extra.js";
 import registerAgent from "./src/commands/agent.js";
 import registerMemory from "./src/commands/memory.js";
 import registerWebapp, { sendWebapp } from "./src/commands/webapp.js";
+import registerDownload from "./src/commands/download.js";
+import registerImage from "./src/commands/image.js";
+import registerAdmin from "./src/commands/admin.js";
 import { registerMenu } from "./src/menu.js";
 import { startWebApp } from "./src/webapp.js";
 
@@ -52,6 +56,7 @@ registerDatetime(bot);
 registerWeb(bot);
 registerFun(bot);
 registerGames(bot);
+registerGame(bot, deps);
 registerPersonal(bot, deps);
 registerGroup(bot, deps);
 registerProductivity(bot, deps);
@@ -63,6 +68,9 @@ registerExtra(bot);
 registerAgent(bot);
 registerMemory(bot);
 registerWebapp(bot);
+registerDownload(bot);
+registerImage(bot);
+registerAdmin(bot);
 
 registerMenu(bot, { sendWebapp });
 
@@ -72,6 +80,9 @@ bot.on("message", async (ctx, next) => {
   if (!ctx.from) return next();
   store.touchUser(ctx.from.id);
   store.getChat(ctx.chat.id).messageCount += 1;
+  if (ctx.chat.type === "private") {
+    store.getUser(ctx.from.id).lastChatId = ctx.chat.id;
+  }
   store.save();
 
   if (ctx.chat.type === "private" && ctx.message.text) {
@@ -128,7 +139,7 @@ async function handleChat(ctx, text) {
       const extra = [];
       if (mem.summary) extra.push(`Ongoing conversation summary:\n${mem.summary}`);
       if (mem.facts) extra.push(`Long-term memories about this person:\n${mem.facts}`);
-      system = (system || "You are Madelin, a smart assistant.") + "\n\n" + extra.join("\n\n");
+      system = (system || "You are Madellin, a smart assistant.") + "\n\n" + extra.join("\n\n");
     }
     const answer = await chat(text, memory.get(id).slice(0, -1), system);
     if (!answer) throw new Error("empty response");
@@ -171,6 +182,10 @@ async function setupWebApp() {
       { command: "start", description: "صفحه اصلی و منو" },
       { command: "webapp", description: "نسخه تصویری (وباپ)" },
       { command: "ask", description: "گفتگو با دستیار" },
+      { command: "dl", description: "دانلود ویدیو/مدیا از هر سایتی" },
+      { command: "yt", description: "دانلود ویدیو از یوتیوب" },
+      { command: "insta", description: "دانلود از اینستاگرام" },
+      { command: "mp3", description: "دریافت صوت از ویدیو" },
       { command: "commands", description: "لیست همه فرمان‌ها" },
       { command: "help", description: "راهنما" },
       { command: "weather", description: "آب‌وهوا" },

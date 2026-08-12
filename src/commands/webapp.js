@@ -3,6 +3,12 @@ import { reg } from "../utils.js";
 import config from "../config.js";
 
 export async function sendWebapp(ctx) {
+  if (!/^https:\/\//i.test(config.webappUrl)) {
+    return ctx.reply(
+      "وباپ هنوز فعال نشده است: تلگرام برای دکمه‌ی inline فقط آدرس https می‌پذیرد.\n" +
+        "به محض تنظیم WEBAPP_URL به یک آدرس https عمومی (مثلاً با cloudflared) این دکمه فعال می‌شود."
+    );
+  }
   const kb = new InlineKeyboard().webApp("🌐 باز کردن وباپ مادی‌بات", config.webappUrl);
   await ctx.reply("نسخه‌ی تصویری مادی‌بات را باز کن 👇", { reply_markup: kb });
 }

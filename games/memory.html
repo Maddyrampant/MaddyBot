@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🃏 Memory Match</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  .hud { display: flex; gap: 16px; justify-content: center; margin: 12px 0; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 18px; font-size: 15px; font-weight: 700; }
+  .pill b { color: #ffd166; }
+  #grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: min(92vw, 340px); }
+  .card { aspect-ratio: 1; border-radius: 14px; background: #3a5a78; display: flex; align-items: center; justify-content: center; font-size: 34px; cursor: pointer; transition: transform .15s, background .15s; border: 1px solid rgba(255,255,255,.12); }
+  .card.hidden { color: transparent; background: #3a5a78; }
+  .card.open { background: #1d9e8f; }
+  .card.matched { background: #2f8f6b; animation: pop .25s; }
+  .card:hover { transform: scale(1.03); }
+  @keyframes pop { 0% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .hint { margin-top: 12px; font-size: 12px; color: #8b97ad; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.86); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 40px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { margin-top: 6px; padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="pill">حرکت <b id="moves">0</b></div>
+    <div class="pill">زمان <b id="time">0</b>s</div>
+    <div class="pill">جفت <b id="pairs">0</b>/8</div>
+  </div>
+  <div id="grid"></div>
+  <div class="hint">جفت‌های یکسان را پیدا کن</div>
+
+  <div id="overlay">
+    <h2>🎉 آفرین!</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "memory";
+const EMOJIS = ["🐶", "🐱", "🦊", "🐸", "🐼", "🦁", "🐯", "🦄"];
+const gridEl = document.getElementById("grid");
+
+let cards, first, lock, moves, pairs, seconds, timer;
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function reset() {
+  cards = shuffle([...EMOJIS, ...EMOJIS]).map((e, i) => ({ emoji: e, state: "hidden", i }));
+  first = null; lock = false;
+  moves = 0; pairs = 0; seconds = 0;
+  clearInterval(timer);
+  timer = setInterval(() => { seconds++; document.getElementById("time").textContent = seconds; }, 1000);
+  render();
+  document.getElementById("overlay").classList.remove("show");
+}
+
+function render() {
+  gridEl.innerHTML = "";
+  cards.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "card " + c.state;
+    d.textContent = c.emoji;
+    d.addEventListener("click", () => flip(c));
+    gridEl.appendChild(d);
+  });
+}
+
+function flip(c) {
+  if (lock || c.state !== "hidden") return;
+  c.state = "open";
+  if (!first) { first = c; render(); return; }
+  moves++;
+  document.getElementById("moves").textContent = moves;
+  if (first.emoji === c.emoji) {
+    first.state = "matched"; c.state = "matched";
+    first = null; pairs++;
+    document.getElementById("pairs").textContent = pairs;
+    if (pairs === 8) win();
+  } else {
+    lock = true;
+    const a = first;
+    first = null;
+    render();
+    setTimeout(() => {
+      a.state = "hidden"; c.state = "hidden";
+      lock = false;
+      render();
+    }, 650);
+    return;
+  }
+  render();
+}
+
+async function win() {
+  clearInterval(timer);
+  const score = Math.max(10, 1000 - moves * 25 - seconds * 5);
+  document.getElementById("oScore").textContent = score;
+  GameSDK.saveLocalBest(KEY, score);
+  const res = await GameSDK.submit(KEY, score);
+  const top = res.top || [];
+  const el = document.getElementById("boardTop");
+  if (top.length) {
+    el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+      top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+  } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+  document.getElementById("overlay").classList.add("show");
+}
+
+document.getElementById("replay").addEventListener("click", reset);
+GameSDK.expand();
+reset();
+</script>
+</body>
+</html>

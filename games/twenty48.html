@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🎲 2048</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  .hud { display: flex; gap: 16px; margin: 14px 0; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 18px; font-size: 15px; font-weight: 700; }
+  .pill b { color: #ffd166; font-size: 17px; }
+  #board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px; background: #0d1526; border: 2px solid rgba(255,255,255,.14); border-radius: 16px; width: min(92vw, 360px); aspect-ratio: 1; }
+  .cell { display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 26px; border-radius: 10px; background: rgba(255,255,255,.05); transition: background .12s, transform .12s; }
+  .cell.t0 { background: rgba(255,255,255,.05); }
+  .cell.t2 { background: #3a5a78; }
+  .cell.t4 { background: #4772a0; }
+  .cell.t8 { background: #2f8f6b; }
+  .cell.t16 { background: #1d9e8f; }
+  .cell.t32 { background: #2f7bbd; }
+  .cell.t64 { background: #7a5fd0; }
+  .cell.t128 { background: #c05fc0; }
+  .cell.t256 { background: #e06b4f; }
+  .cell.t512 { background: #e79c3d; }
+  .cell.t1024 { background: #e7c13d; }
+  .cell.t2048 { background: #f7e04d; color: #10141f; }
+  .cell.merge { transform: scale(1.12); }
+  .hint { margin-top: 12px; font-size: 12px; color: #8b97ad; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.86); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 40px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { margin-top: 6px; padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="pill">امتیاز <b id="score">0</b></div>
+    <div class="pill">بهترین <b id="best">0</b></div>
+  </div>
+  <div id="board"></div>
+  <div class="hint">کلیدهای جهت‌دار یا سوییپ برای حرکت</div>
+
+  <div id="overlay">
+    <h2 id="oTitle">🎲 پایان بازی!</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "twenty48";
+const boardEl = document.getElementById("board");
+let grid, score, best, over, moved;
+
+function empty() { return Array.from({ length: 4 }, () => Array(4).fill(0)); }
+
+function reset() {
+  grid = empty();
+  score = 0;
+  best = Math.max(GameSDK.localBest(KEY) || 0, Number(localStorage.getItem("maddy2048best") || 0));
+  over = false;
+  addTile(); addTile();
+  document.getElementById("overlay").classList.remove("show");
+  render();
+}
+
+function addTile() {
+  const cells = [];
+  grid.forEach((r, i) => r.forEach((v, j) => { if (!v) cells.push([i, j]); }));
+  if (!cells.length) return;
+  const [i, j] = cells[Math.floor(Math.random() * cells.length)];
+  grid[i][j] = Math.random() < .9 ? 2 : 4;
+}
+
+function render() {
+  boardEl.innerHTML = "";
+  grid.flat().forEach((v) => {
+    const d = document.createElement("div");
+    d.className = "cell t" + v;
+    d.textContent = v || "";
+    boardEl.appendChild(d);
+  });
+  document.getElementById("score").textContent = score;
+  document.getElementById("best").textContent = Math.max(best, score);
+}
+
+function slideRow(row) {
+  const vals = row.filter(Boolean);
+  const out = [];
+  let gain = 0;
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i] === vals[i + 1]) { out.push(vals[i] * 2); gain += vals[i] * 2; i++; }
+    else out.push(vals[i]);
+  }
+  while (out.length < 4) out.push(0);
+  return { out, gain };
+}
+
+function move(dir) {
+  let gain = 0;
+  moved = false;
+  const newGrid = empty();
+  for (let i = 0; i < 4; i++) {
+    let line = [];
+    for (let j = 0; j < 4; j++) line.push(grid[i][j]);
+    if (dir === "right") line.reverse();
+    if (dir === "up" || dir === "down") {
+      line = [0, 1, 2, 3].map(j => grid[j][i]);
+      if (dir === "down") line.reverse();
+    }
+    const { out, gain: g } = slideRow(line);
+    gain += g;
+    if (dir === "right") out.reverse();
+    if (dir === "left") out.forEach((v, j) => newGrid[i][j] = v);
+    else if (dir === "right") out.forEach((v, j) => newGrid[i][j] = v);
+    else if (dir === "up" || dir === "down") { if (dir === "down") out.reverse(); out.forEach((v, j) => newGrid[j][i] = v); }
+  }
+  moved = JSON.stringify(grid) !== JSON.stringify(newGrid);
+  if (moved) { grid = newGrid; score += gain; addTile(); render(); }
+  if (!movesLeft()) endGame();
+}
+
+function movesLeft() {
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    if (!grid[i][j]) return true;
+    if (j < 3 && grid[i][j] === grid[i][j + 1]) return true;
+    if (i < 3 && grid[i][j] === grid[i + 1][j]) return true;
+  }
+  return false;
+}
+
+async function endGame() {
+  if (over) return;
+  over = true;
+  GameSDK.saveLocalBest(KEY, score);
+  const won = grid.flat().includes(2048);
+  document.getElementById("oTitle").textContent = won ? "🎉 بردی! بردی ۲۰۴۸!" : "🎲 پایان بازی!";
+  document.getElementById("oScore").textContent = score;
+  const res = await GameSDK.submit(KEY, score);
+  const top = res.top || [];
+  const el = document.getElementById("boardTop");
+  if (top.length) {
+    el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+      top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+  } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+  document.getElementById("overlay").classList.add("show");
+}
+
+window.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (k === "arrowup" || k === "w") move("up");
+  if (k === "arrowdown" || k === "s") move("down");
+  if (k === "arrowleft" || k === "a") move("left");
+  if (k === "arrowright" || k === "d") move("right");
+  if (k.startsWith("arrow")) e.preventDefault();
+});
+
+let sx = 0, sy = 0;
+window.addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+window.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+  if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? "right" : "left");
+  else move(dy > 0 ? "down" : "up");
+}, { passive: true });
+
+document.getElementById("replay").addEventListener("click", reset);
+GameSDK.expand();
+reset();
+</script>
+</body>
+</html>

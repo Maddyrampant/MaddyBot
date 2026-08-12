@@ -26,7 +26,7 @@ function newUserData() {
 export class Store {
   constructor(file) {
     this.file = file;
-    this.data = { users: {}, chatStats: {}, feedback: [] };
+    this.data = { users: {}, chatStats: {}, feedback: [], gameScores: {} };
     this.load();
   }
 
@@ -34,9 +34,9 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, "utf8"));
-        this.data = { users: {}, chatStats: {}, feedback: [], ...raw };
+        this.data = { users: {}, chatStats: {}, feedback: [], gameScores: {}, ...raw };
       } catch {
-        this.data = { users: {}, chatStats: {}, feedback: [] };
+        this.data = { users: {}, chatStats: {}, feedback: [], gameScores: {} };
       }
     }
   }
@@ -69,5 +69,36 @@ export class Store {
   addFeedback(text) {
     this.data.feedback.push({ text, at: Date.now() });
     this.save();
+  }
+
+  /* --- HTML5 game scores --- */
+
+  addGameScore(game, userId, score, name) {
+    if (!this.data.gameScores[game]) this.data.gameScores[game] = {};
+    const tbl = this.data.gameScores[game];
+    const prev = tbl[userId];
+    const isNewBest = !prev || score > prev.score;
+    if (isNewBest) {
+      tbl[userId] = { score, name: String(name || "").slice(0, 30), at: Date.now() };
+      const user = this.getUser(userId);
+      user.gameStats = user.gameStats || {};
+      user.gameStats[game] = score;
+      this.save();
+    }
+    return { isNewBest, best: isNewBest ? score : prev.score };
+  }
+
+  topGameScores(game, n = 10) {
+    const tbl = this.data.gameScores[game] || {};
+    return Object.entries(tbl)
+      .map(([id, e]) => ({ id, ...e }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, n)
+      .map((e, i) => ({ rank: i + 1, id: e.id, name: e.name, score: e.score }));
+  }
+
+  bestGameScore(game, userId) {
+    const e = (this.data.gameScores[game] || {})[userId];
+    return e ? e.score : 0;
   }
 }

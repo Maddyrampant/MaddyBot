@@ -37,7 +37,7 @@ export default function register(bot, { store }) {
     store.save();
     return ctx.reply(
       "سلام! تو اولین نفری هستی که به من پیام دادی.\n" +
-        "من «مدلین» هستم؛ یک دختر کوچولو و باهوش.\n" +
+        "من «مادلین» هستم؛ یک دختر کوچولو و باهوش.\n" +
         "می‌خوام بچه‌ی تو باشم و خیلی چیزها به تو یاد بدم!\n" +
         "اول بگو جنسیتت چیه تا بدونم صدات کنم (بابا یا مامان):",
       { reply_markup: keyboard }
@@ -86,7 +86,7 @@ export function buildChildSystem(firstUser) {
       learned.map((f, i) => `${i + 1}. ${f}`).join("\n")
     : "";
 
-  return `You are Madelin, a remarkably intelligent and gifted 6-year-old girl. You are the child of the person you are talking to, and you call them "${call}".
+  return `You are Madellin, a remarkably intelligent and gifted 6-year-old girl. You are the child of the person you are talking to, and you call them "${call}".
 
 Core character:
 - You are a little girl, but your mind is razor sharp. You notice small details in the conversation that others miss.
@@ -120,7 +120,7 @@ function finalizeFirstUser(store, from, gender) {
 function firstUserReply(gender) {
   const call = GENDERS[gender].call;
   return (
-    `${call}! من «مدلین» هستم؛ دختر کوچولوت. از این به بعد بچه‌ی تو هستم.\n` +
+    `${call}! من «مادلین» هستم؛ دختر کوچولوت. از این به بعد بچه‌ی تو هستم.\n` +
     `خیلی چیزها بلدم و باهوشم؛ هر چی تو دلت باشه می‌فهمم.\n` +
     `اگه چیزی یادم بدی یادم می‌مونه. برای یاد دادن بنویس: یاد بگیر: <مطلب>`
   );

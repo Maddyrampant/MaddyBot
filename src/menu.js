@@ -7,6 +7,7 @@ import {
   groupLabel,
   cmdDesc,
   escapeHtml,
+  isOwnerCtx,
 } from "./utils.js";
 
 const PER_PAGE = 6;
@@ -18,20 +19,25 @@ export function replyKeyboard() {
   return new Keyboard().text("🧭 منو").text("🤖 دستیار").text("🌐 وباپ").resized();
 }
 
-function groupsWithCommands() {
-  return allGroups().filter(([key]) => commandsByGroup(key).length);
+function groupsWithCommands(isOwner = true) {
+  return allGroups().filter(([key]) => commandsByGroup(key, isOwner).length);
 }
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-export function mainMenu(page = 0) {
-  const groups = groupsWithCommands();
+export function mainMenu(page = 0, isOwner = true) {
+  const groups = groupsWithCommands(isOwner);
   const pages = Math.max(1, Math.ceil(groups.length / PER_PAGE));
   const p = clamp(Number(page) || 0, 0, pages - 1);
   const kb = new InlineKeyboard();
-  kb.webApp("🌐 وباپ مادی‌بات", config.webappUrl).row();
+  if (/^https:\/\//i.test(config.webappUrl)) {
+    kb.webApp("🌐 وباپ مادی‌بات", config.webappUrl);
+  } else {
+    kb.text("🌐 وباپ مادی‌بات", "m:app");
+  }
+  kb.row();
   const slice = groups.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
   for (let i = 0; i < slice.length; i += COLS) {
     kb.text(groupLabel(slice[i][0]), "m:grp:" + slice[i][0]);
@@ -48,8 +54,8 @@ export function mainMenu(page = 0) {
   return kb;
 }
 
-export function groupMenu(key, page = 0) {
-  const cmds = commandsByGroup(key);
+export function groupMenu(key, page = 0, isOwner = true) {
+  const cmds = commandsByGroup(key, isOwner);
   const pages = Math.max(1, Math.ceil(cmds.length / PER_PAGE));
   const p = clamp(Number(page) || 0, 0, pages - 1);
   const kb = new InlineKeyboard();
@@ -70,9 +76,9 @@ export function groupMenu(key, page = 0) {
   return kb;
 }
 
-export function cmdView(name) {
+export function cmdView(name, isOwner = true) {
   const meta = registry[name];
-  if (!meta) return null;
+  if (!meta || (meta.ownerOnly && !isOwner)) return null;
   const text =
     `/<b>${escapeHtml(meta.name)}</b>` +
     `${meta.usage ? " " + escapeHtml(meta.usage) : ""}\n` +
@@ -103,7 +109,7 @@ function aboutText() {
 }
 
 export function showMain(ctx) {
-  return showMenu(ctx, mainMenu(0), MAIN_TEXT);
+  return showMenu(ctx, mainMenu(0, isOwnerCtx(ctx)), MAIN_TEXT);
 }
 
 export async function showMenu(ctx, kb, text) {
@@ -125,6 +131,7 @@ export function registerMenu(bot, deps) {
   bot.on("callback_query:data", async (ctx, next) => {
     const data = ctx.callbackQuery.data;
     if (!data.startsWith("m:")) return next();
+    const isOwner = isOwnerCtx(ctx);
     const parts = data.split(":");
     const action = parts[1];
     try {
@@ -132,15 +139,15 @@ export function registerMenu(bot, deps) {
         case "home":
           return showMain(ctx);
         case "main":
-          return showMenu(ctx, mainMenu(Number(parts[3] || parts[2]) || 0), MAIN_TEXT);
+          return showMenu(ctx, mainMenu(Number(parts[3] || parts[2]) || 0, isOwner), MAIN_TEXT);
         case "grp": {
           const key = parts[2];
           const page = parts[3] === "p" ? Number(parts[4] || 0) : 0;
           const text = `<b>${groupLabel(key)}</b>\nدستوری را انتخاب کنید.`;
-          return showMenu(ctx, groupMenu(key, page), text);
+          return showMenu(ctx, groupMenu(key, page, isOwner), text);
         }
         case "cmd": {
-          const view = cmdView(parts[2]);
+          const view = cmdView(parts[2], isOwner);
           if (!view) return ctx.answerCallbackQuery({ text: "فرمان پیدا نشد." });
           return showMenu(ctx, view.kb, view.text);
         }
@@ -165,7 +172,7 @@ export function registerMenu(bot, deps) {
     if (ctx.chat.type !== "private") return next();
     const t = (ctx.message.text || "").trim();
     if (t === "🧭 منو") {
-      return ctx.reply(MAIN_TEXT, { parse_mode: "HTML", reply_markup: mainMenu(0) });
+      return ctx.reply(MAIN_TEXT, { parse_mode: "HTML", reply_markup: mainMenu(0, isOwnerCtx(ctx)) });
     }
     if (t === "🤖 دستیار") {
       return ctx.reply(`<b>${groupLabel("ai")}</b>\nدستوری را انتخاب کنید.`, {

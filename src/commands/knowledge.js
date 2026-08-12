@@ -6,7 +6,7 @@ export default function register(bot) {
   reg("wiki", { usage: "<topic>", desc: "Wikipedia summary", group: "knowledge" });
   reg("define", { usage: "<word>", desc: "Dictionary definition", group: "knowledge" });
   reg("learn", { usage: "<skill>", desc: "Learning path for a skill", group: "knowledge" });
-  reg("teach", { usage: "<topic>", desc: "Madelin teaches you a topic", group: "knowledge" });
+  reg("teach", { usage: "<topic>", desc: "Madellin teaches you a topic", group: "knowledge" });
   reg("interview", { usage: "<role>", desc: "Interview questions for a role", group: "knowledge" });
   reg("resume", { usage: "<role>", desc: "Resume tips for a role", group: "knowledge" });
   reg("coverletter", { usage: "<role> <company>", desc: "Draft a cover letter", group: "knowledge" });

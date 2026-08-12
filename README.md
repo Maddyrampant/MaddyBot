@@ -15,8 +15,9 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 - **Personal tools** — to-do lists, notes, reminders, custom keyword replies, and birthday tracking.
 - **Group moderation** — welcome messages, kick, ban, mute, and a warning system.
 - **Works in private chats and groups** — in groups the bot replies when mentioned (`@username`) or when its message is replied to.
+- **Media downloads** — `/dl`, `/yt`, `/insta`, and `/mp3` download videos and audio from YouTube, Instagram, TikTok, and 1000+ other sites (via local `yt-dlp` + `ffmpeg`, capped at 45&nbsp;MB).
 - **Button menu** — `/start` and `/commands` open an interactive inline-keyboard menu (categories → commands → details) plus a quick Reply Keyboard under the input bar.
-- **Visual mode (Telegram Mini App)** — a glassmorphism web UI served by the bot itself: dashboard, streaming chat with Madelin, memory browser, and a searchable command catalog. Opened from the bot menu button or `/webapp`.
+- **Visual mode (Telegram Mini App)** — a glassmorphism web UI served by the bot itself: dashboard, streaming chat with Madellin, memory browser, and a searchable command catalog. Opened from the bot menu button or `/webapp`.
 
 ## Commands
 
@@ -135,6 +136,17 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/dns <host>` | DNS records for a host |
 | `/geo <query>` | Geocode a location |
 
+### Media & Downloads
+
+| Command | Description |
+| --- | --- |
+| `/dl <url>` | Download video/media from YouTube, Instagram, TikTok, and 1000+ sites |
+| `/yt <url>` | Download a YouTube video |
+| `/insta <url>` | Download from Instagram (post, reel, story) |
+| `/mp3 <url>` | Extract the audio (mp3) from a video |
+
+> Downloads are capped at ~45&nbsp;MB (Telegram's 50&nbsp;MB upload limit) and use local `yt-dlp` + `ffmpeg`. Only download content you have the right to use.
+
 ### Agent & Dev
 
 | Command | Description |
@@ -171,6 +183,34 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/memory <sequence>` | Memory sequence game |
 | `/counter start\|stop` | Group counting game |
 
+### HTML5 Games (visual arcade)
+
+Playable inside Telegram with real high-score leaderboards:
+
+| Game | Short name | Description |
+| --- | --- | --- |
+| 🐍 Snake | `snake` | Eat food, grow longer |
+| 🎲 2048 | `twenty48` | Merge tiles to reach 2048 |
+| 🏓 Pong | `pong` | Classic Pong vs the AI |
+| 🧱 Breakout | `breakout` | Break bricks, clear levels |
+| 🃏 Memory Match | `memory` | Find matching pairs |
+| 💣 Minesweeper | `mines` | Clear the minefield |
+| 🔴 Simon Says | `simon` | Repeat the color sequence |
+| 🧩 Tetris | `tetris` | Stack blocks, clear lines |
+| 🔨 Whack-a-Mole | `whack` | 30 seconds of mole whacking |
+| 🐦 Flappy | `flappy` | Guide the bird through pipes |
+
+- `/games` — list every game as a button; tapping it sends the game, then press **Play**.
+- `/game <short name>` — send one game directly.
+- `/top <short name>` — show the top-10 high-score table in the chat.
+- High scores are verified with the signed Telegram launch URL and stored per user; the
+  game overlay shows your rank and the leaderboard after every round.
+
+> **Register the games once with @BotFather** so `sendGame` works. For each short name above,
+> run `/newgame` in @BotFather, then repeat `/setuserpic` to give it an image. Games are hosted
+> by this bot itself (`/games/<file>` on the WebApp server), so no external hosting is needed —
+> the same `WEBAPP_URL` (https) is used for the game URLs.
+
 ### Personal
 
 | Command | Description |
@@ -195,6 +235,17 @@ A multi-purpose Telegram assistant with 100+ commands: chat, translation, text t
 | `/unmute` | Unmute a user |
 | `/warn` | Warn a user, 3 warns = kick |
 | `/admins` | List group administrators |
+
+### Admin (owner only)
+
+| Command | Description |
+| --- | --- |
+| `/admin` | Open the admin panel (inline buttons) |
+| `/sys` | System status: CPU, RAM, disk, uptime |
+| `/log [n]` | Last lines of the bot log |
+| `/restart` | Restart the bot (PM2) |
+
+> Owner-only commands check `OWNER_ID`; non-owners get a "permission denied" reply.
 
 ## Requirements
 
@@ -295,9 +346,12 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 │   │   ├── fun.js           # fun and media commands
 │   │   ├── games.js         # interactive games
 │   │   ├── personal.js      # todos, notes, reminders, aliases
+│   │   ├── game.js          # HTML5 games: /games, /game, /top, sendGame + scores
 │   │   ├── group.js         # group moderation
 │   │   ├── agent.js         # /agent, /run, /api, /search, /fetch, /browse
-│   │   └── memory.js        # /remember, /memories, /forget, /status
+│   │   ├── memory.js        # /remember, /memories, /forget, /status
+│   │   └── admin.js         # owner-only admin panel: /admin, /sys, /log, /restart
+│   ├── gamecatalog.js      # HTML5 game catalog (short names, files)
 │   ├── config.js            # environment configuration
 │   ├── ai.js                # Gemini client wrapper (chat + embeddings + streaming)
 │   ├── menu.js              # inline-keyboard menu router + reply keyboard
@@ -315,6 +369,9 @@ This keeps group chats quiet unless the bot is addressed. Moderation commands re
 │   ├── index.html
 │   ├── styles.css
 │   └── app.js
+├── games/                   # self-contained HTML5 games (served at /games/*)
+│   ├── sdk.js               # shared SDK: auth + score submission + leaderboard
+│   ├── snake.html, tetris.html, twenty48.html, ...
 └── data/                    # runtime data (created at runtime, ignored by git)
 ```
 

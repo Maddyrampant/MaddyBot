@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🐦 Flappy</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  .hud { display: flex; gap: 16px; justify-content: center; margin: 12px 0; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 18px; font-size: 15px; font-weight: 700; }
+  .pill b { color: #ffd166; }
+  canvas { background: linear-gradient(180deg, #12203a 0%, #0d1526 100%); border: 2px solid rgba(255,255,255,.14); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); width: min(94vw, 380px); touch-action: none; }
+  .hint { margin-top: 12px; font-size: 12px; color: #8b97ad; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.86); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 40px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { margin-top: 6px; padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="pill">امتیاز <b id="score">0</b></div>
+    <div class="pill">بهترین <b id="best">0</b></div>
+  </div>
+  <canvas id="c"></canvas>
+  <div class="hint">👇 لمس / کلیک / فاصله — بال بزن و از لوله‌ها رد شو</div>
+
+  <div id="overlay">
+    <h2>🐦 تمام شد!</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "flappy";
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const W = 380, H = 480;
+canvas.width = W; canvas.height = H;
+const BIRD = { x: 70, r: 14, gy: 0.38 };
+const PIPE_W = 56, GAP = 150;
+
+let bird, pipes, score, best, over, started, anim;
+
+function reset() {
+  bird = { y: H / 2, vy: 0 };
+  pipes = [];
+  score = 0; over = false; started = false;
+  best = GameSDK.localBest(KEY) || 0;
+  document.getElementById("score").textContent = 0;
+  document.getElementById("best").textContent = best;
+  document.getElementById("overlay").classList.remove("show");
+  cancelAnimationFrame(anim);
+  loop();
+}
+
+function flap() {
+  if (over) return;
+  started = true;
+  bird.vy = -5.6;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  pipes.forEach(p => {
+    ctx.fillStyle = "#3ee08a";
+    ctx.fillRect(p.x, 0, PIPE_W, p.top);
+    ctx.fillStyle = "#2a9d68";
+    ctx.fillRect(p.x, p.top - 20, PIPE_W, 20);
+    ctx.fillStyle = "#3ee08a";
+    ctx.fillRect(p.x, p.top + GAP, PIPE_W, H - p.top - GAP);
+    ctx.fillStyle = "#2a9d68";
+    ctx.fillRect(p.x, p.top + GAP, PIPE_W, 20);
+  });
+  ctx.save();
+  ctx.translate(BIRD.x, bird.y);
+  ctx.rotate(Math.max(-0.5, Math.min(0.6, bird.vy / 8)));
+  ctx.fillStyle = "#ffd166"; ctx.shadowColor = "#ffd166"; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(0, 0, BIRD.r, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#10141f";
+  ctx.beginPath(); ctx.arc(BIRD.r * .6, -4, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function loop() {
+  if (!over) {
+    if (started) {
+      bird.vy += BIRD.gy;
+      bird.y += bird.vy;
+      if (pipes.length === 0 || pipes[pipes.length - 1].x < W - 180) {
+        const top = 40 + Math.random() * (H - GAP - 120);
+        pipes.push({ x: W + 20, top });
+      }
+      pipes.forEach(p => p.x -= 2.6);
+      pipes = pipes.filter(p => p.x > -PIPE_W);
+      for (const p of pipes) {
+        if (!p.passed && p.x + PIPE_W < BIRD.x) {
+          p.passed = true;
+          score++;
+          document.getElementById("score").textContent = score;
+          if (score > best) { best = score; document.getElementById("best").textContent = best; GameSDK.saveLocalBest(KEY, score); }
+        }
+        const hitPipe = BIRD.x + BIRD.r > p.x && BIRD.x - BIRD.r < p.x + PIPE_W &&
+          (bird.y - BIRD.r < p.top || bird.y + BIRD.r > p.top + GAP);
+        if (hitPipe) { gameOver(); break; }
+      }
+      if (bird.y - BIRD.r < 0 || bird.y + BIRD.r > H) gameOver();
+    } else {
+      bird.y = H / 2 + Math.sin(Date.now() / 300) * 8;
+    }
+    draw();
+  }
+  anim = requestAnimationFrame(loop);
+}
+
+canvas.addEventListener("pointerdown", () => { if (!over) flap(); });
+window.addEventListener("keydown", e => {
+  if (e.key === " " || e.key === "ArrowUp" || e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!over) flap();
+  }
+});
+
+async function gameOver() {
+  if (over) return;
+  over = true;
+  document.getElementById("oScore").textContent = score;
+  GameSDK.saveLocalBest(KEY, score);
+  const res = await GameSDK.submit(KEY, score);
+  const top = res.top || [];
+  const el = document.getElementById("boardTop");
+  if (top.length) {
+    el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+      top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+  } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+  document.getElementById("overlay").classList.add("show");
+}
+
+document.getElementById("replay").addEventListener("click", reset);
+GameSDK.expand();
+reset();
+</script>
+</body>
+</html>

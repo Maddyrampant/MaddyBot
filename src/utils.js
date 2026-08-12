@@ -1,6 +1,7 @@
 export const registry = {};
 
 import { GROUPS_FA, DESCS_FA } from "./fa.js";
+import config from "./config.js";
 
 const GROUPS = [
   ["core", "General"],
@@ -9,6 +10,8 @@ const GROUPS = [
   ["math", "Math"],
   ["datetime", "Date & Time"],
   ["web", "Web"],
+  ["media", "Media"],
+  ["image", "Image"],
   ["fun", "Fun"],
   ["games", "Games"],
   ["personal", "Personal"],
@@ -19,11 +22,20 @@ const GROUPS = [
   ["knowledge", "Knowledge"],
   ["dev", "Developer"],
   ["extra", "Utilities"],
+  ["admin", "Admin"],
 ];
 
 export function reg(name, meta) {
-  registry[name] = { name, usage: "", desc: "", group: "core", ...meta };
+  registry[name] = { name, usage: "", desc: "", group: "core", ownerOnly: false, ...meta };
   return name;
+}
+
+export function isOwnerId(id) {
+  return Boolean(config.ownerId && Number(id) === Number(config.ownerId));
+}
+
+export function isOwnerCtx(ctx) {
+  return isOwnerId(ctx?.from?.id);
 }
 
 export function groupLabel(key) {
@@ -40,9 +52,9 @@ export function allGroups() {
   return GROUPS;
 }
 
-export function commandsByGroup(group) {
+export function commandsByGroup(group, isOwner = true) {
   return Object.values(registry)
-    .filter((c) => c.group === group)
+    .filter((c) => c.group === group && (!c.ownerOnly || isOwner))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

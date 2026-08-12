@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🔴 Simon Says</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  .hud { display: flex; gap: 16px; justify-content: center; margin: 12px 0; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 18px; font-size: 15px; font-weight: 700; }
+  .pill b { color: #ffd166; }
+  #simon { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(92vw, 320px); }
+  .pad { aspect-ratio: 1; border-radius: 20px; border: none; cursor: pointer; opacity: .75; transition: opacity .12s, transform .12s, box-shadow .12s; }
+  .pad.lit { opacity: 1; transform: scale(.96); box-shadow: 0 0 40px 6px currentColor; }
+  .pad0 { background: #ff6b6b; color: #ff6b6b; }
+  .pad1 { background: #ffd166; color: #ffd166; }
+  .pad2 { background: #3ee08a; color: #3ee08a; }
+  .pad3 { background: #4db8ff; color: #4db8ff; }
+  .status { margin-top: 14px; font-size: 16px; font-weight: 700; min-height: 22px; }
+  .hint { margin-top: 6px; font-size: 12px; color: #8b97ad; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.86); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 40px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { margin-top: 6px; padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="pill">مرحله <b id="level">1</b></div>
+    <div class="pill">بهترین <b id="best">0</b></div>
+  </div>
+  <div id="simon"></div>
+  <div class="status" id="status">دنباله را تکرار کن...</div>
+  <div class="hint">رنگ‌ها را به ترتیب تکرار کن — مرحله‌های بیشتر یعنی امتیاز بیشتر</div>
+
+  <div id="overlay">
+    <h2>🔴 اشتباه شد!</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "simon";
+const COLORS = ["#ff6b6b", "#ffd166", "#3ee08a", "#4db8ff"];
+const simonEl = document.getElementById("simon");
+let seq, level, best, playing, playerIdx, litTimer;
+
+function reset() {
+  seq = []; level = 0; playing = false; playerIdx = 0;
+  best = GameSDK.localBest(KEY) || 0;
+  document.getElementById("best").textContent = best;
+  document.getElementById("overlay").classList.remove("show");
+  nextRound();
+}
+
+function nextRound() {
+  seq.push(Math.floor(Math.random() * 4));
+  level++;
+  document.getElementById("level").textContent = level;
+  document.getElementById("status").textContent = "توجه کن...";
+  playing = false;
+  setTimeout(playSeq, 700);
+}
+
+function lit(i, ms) {
+  const pad = document.getElementById("pad" + i);
+  pad.classList.add("lit");
+  return new Promise(res => setTimeout(() => { pad.classList.remove("lit"); res(); }, ms));
+}
+
+async function playSeq() {
+  for (let i = 0; i < seq.length; i++) {
+    await lit(seq[i], Math.max(220, 520 - level * 12));
+    await new Promise(r => setTimeout(r, 120));
+  }
+  playing = true;
+  playerIdx = 0;
+  document.getElementById("status").textContent = "نوبت توست!";
+}
+
+function press(i) {
+  lit(i, 180);
+  if (!playing) return;
+  if (i !== seq[playerIdx]) return fail();
+  playerIdx++;
+  if (playerIdx === seq.length) {
+    playing = false;
+    if (level > best) { best = level; GameSDK.saveLocalBest(KEY, level); document.getElementById("best").textContent = best; }
+    setTimeout(nextRound, 700);
+  }
+}
+
+async function fail() {
+  playing = false;
+  document.getElementById("status").textContent = "اشتباه!";
+  document.getElementById("oScore").textContent = level;
+  GameSDK.saveLocalBest(KEY, level);
+  const res = await GameSDK.submit(KEY, level);
+  const top = res.top || [];
+  const el = document.getElementById("boardTop");
+  if (top.length) {
+    el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>مرحله</span></div>" +
+      top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+  } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+  document.getElementById("overlay").classList.add("show");
+}
+
+COLORS.forEach((c, i) => {
+  const b = document.createElement("button");
+  b.id = "pad" + i;
+  b.className = "pad pad" + i;
+  b.addEventListener("pointerdown", () => press(i));
+  simonEl.appendChild(b);
+});
+
+document.getElementById("replay").addEventListener("click", reset);
+GameSDK.expand();
+reset();
+</script>
+</body>
+</html>

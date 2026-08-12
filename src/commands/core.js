@@ -1,4 +1,4 @@
-import { reg, registry, argText, allGroups, groupLabel } from "../utils.js";
+import { reg, registry, argText, allGroups, groupLabel, isOwnerCtx } from "../utils.js";
 import { mainMenu, groupMenu, cmdView, replyKeyboard, MAIN_TEXT, showMain } from "../menu.js";
 
 const bootTime = Date.now();
@@ -22,7 +22,7 @@ export default function register(bot, { store }) {
       "سلام! من مادی‌بات هستم 🤖\n" +
         "می‌تونم گفتگو کنم، ترجمه کنم، QR بسازم، بازی کنم، آب‌وهوا رو بگم و کلی کار دیگه.\n" +
         "از دکمه‌های زیر یا Reply Keyboard برای پیمایش استفاده کن.",
-      { parse_mode: "HTML", reply_markup: mainMenu(0) }
+      { parse_mode: "HTML", reply_markup: mainMenu(0, isOwnerCtx(ctx)) }
     );
     await ctx.reply("دکمه‌های سریع برای دسترسی راحت‌تر 👇", { reply_markup: replyKeyboard() });
   });
@@ -33,20 +33,20 @@ export default function register(bot, { store }) {
     if (arg) {
       const meta = registry[arg];
       if (meta) {
-        const view = cmdView(arg);
+        const view = cmdView(arg, isOwnerCtx(ctx));
         return ctx.reply(view.text, { parse_mode: "HTML", reply_markup: view.kb });
       }
       const isGroup = allGroups().some(([k]) => k === arg);
       if (isGroup) {
         return ctx.reply(`<b>${groupLabel(arg)}</b>\nدستوری را انتخاب کنید.`, {
           parse_mode: "HTML",
-          reply_markup: groupMenu(arg, 0),
+          reply_markup: groupMenu(arg, 0, isOwnerCtx(ctx)),
         });
       }
       return ctx.reply("فرمان ناشناخته: /" + arg);
     }
 
-    return ctx.reply(MAIN_TEXT, { parse_mode: "HTML", reply_markup: mainMenu(0) });
+    return ctx.reply(MAIN_TEXT, { parse_mode: "HTML", reply_markup: mainMenu(0, isOwnerCtx(ctx)) });
   });
 
   bot.command("id", async (ctx) => {

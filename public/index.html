@@ -73,13 +73,17 @@
               <svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.4-.7L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
               شروع گفتگو
             </button>
-            <button class="btn" data-goto="memories">
-              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3v13m0-13a6 6 0 0 1 6 6M12 3a6 6 0 0 0-6 6M4 20h16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              خاطرات من
+            <button class="btn" data-goto="games">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 11h4m-2-2v4M14 12h.01M18 12h.01M16.5 5.5 12 10l-4.5-4.5M12 10v8m0-3a4 4 0 0 1 8 0v1a4 4 0 0 1-8 0M12 10a4 4 0 0 0-8 0v1a4 4 0 0 0 8 0" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              بازی‌ها
             </button>
-            <button class="btn" data-goto="commands">
-              <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              همه فرمان‌ها
+            <button class="btn" data-goto="image">
+              <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="m5 18 5-5 3 3 3-3 3 3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              تصویر
+            </button>
+            <button class="btn" data-goto="tools">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L4 17l3 3 4.7-4.7a4.5 4.5 0 0 0 6-6L15 12l-3-3 2.7-2.7Z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>
+              ابزارها
             </button>
           </div>
         </section>
@@ -103,26 +107,69 @@
           </div>
         </section>
 
-        <!-- Memories -->
-        <section id="view-memories" class="view">
+        <!-- Games -->
+        <section id="view-games" class="view">
           <div class="section-head">
-            <h2>🧠 خاطرات من</h2>
-            <button class="icon-btn" id="memRefresh" aria-label="به‌روزرسانی">
-              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <h2>🎮 بازی‌ها</h2>
+            <span class="chip" id="gameCount">–</span>
           </div>
-          <p class="muted" id="memEmpty">خاطره‌ای ثبت نشده. با مادلین چت کن تا کم‌کم شما را بشناسد.</p>
-          <div id="memList"></div>
+          <div class="game-grid" id="gameList"></div>
         </section>
 
-        <!-- Commands -->
-        <section id="view-commands" class="view">
+        <!-- Image studio -->
+        <section id="view-image" class="view">
           <div class="section-head">
-            <h2>📋 فرمان‌ها</h2>
-            <span class="chip" id="cmdCount">–</span>
+            <h2>🖼 استودیوی تصویر</h2>
           </div>
-          <input id="cmdSearch" class="search-input" type="search" placeholder="جستجوی فرمان…" />
-          <div id="cmdList"></div>
+
+          <div class="glass img-upload">
+            <div class="img-upload-title">یک تصویر انتخاب کن</div>
+            <div class="img-upload-actions">
+              <button class="btn btn-primary" id="imgPickBtn">📤 از دستگاه</button>
+              <input id="imgFile" type="file" accept="image/*" hidden />
+              <button class="btn" id="imgSampleBtn">🧪 یک نمونه</button>
+            </div>
+            <div class="img-url-row">
+              <input id="imgUrl" class="search-input" type="text" placeholder="یا آدرس اینترنتی تصویر را بچسبان…" />
+              <button class="btn" id="imgUrlBtn">بارگذاری</button>
+            </div>
+          </div>
+
+          <div class="img-preview hidden" id="imgPreview">
+            <img id="imgView" alt="پیش‌نمایش" />
+            <div class="img-meta-row">
+              <span class="chip" id="imgMeta"></span>
+              <button class="btn btn-small" id="imgDownload">⬇️ دانلود</button>
+              <button class="btn btn-small" id="imgReset">🗑 حذف</button>
+            </div>
+          </div>
+
+          <div class="img-actions hidden" id="imgActions">
+            <div class="img-group">
+              <div class="img-group-label">⚙️ ابزارهای محلی</div>
+              <div class="chip-row" id="imgLocalChips"></div>
+            </div>
+            <div class="img-group">
+              <div class="img-group-label">🤖 هوش مصنوعی</div>
+              <div class="chip-row" id="imgAIChips"></div>
+            </div>
+            <div class="img-prompt-bar hidden" id="imgPromptBar">
+              <input id="imgPrompt" class="search-input" type="text" placeholder="…" />
+              <button class="btn btn-primary" id="imgPromptGo">اجرا</button>
+              <button class="btn" id="imgPromptCancel">لغو</button>
+            </div>
+          </div>
+
+          <div class="img-status" id="imgStatus"></div>
+        </section>
+
+        <!-- Tools hub -->
+        <section id="view-tools" class="view">
+          <div class="section-head">
+            <h2>🧰 ابزارها</h2>
+          </div>
+          <div class="tool-nav" id="toolNav"></div>
+          <div class="tool-panel" id="toolPanel"></div>
         </section>
       </main>
 
@@ -135,13 +182,17 @@
           <svg viewBox="0 0 24 24" width="22" height="22"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.4-.7L3 21l1.8-5.6A8.4 8.4 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>گفتگو</span>
         </button>
-        <button class="tab" data-view="memories">
-          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3v13m0-13a6 6 0 0 1 6 6M12 3a6 6 0 0 0-6 6M4 20h16" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>حافظه</span>
+        <button class="tab" data-view="games">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 11h4m-2-2v4M14 12h.01M18 12h.01M16.5 5.5 12 10l-4.5-4.5M12 10v8" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>بازی‌ها</span>
         </button>
-        <button class="tab" data-view="commands">
-          <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          <span>فرمان‌ها</span>
+        <button class="tab" data-view="image">
+          <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.7" fill="none"/><circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="m5 18 5-5 3 3 3-3 3 3" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>تصویر</span>
+        </button>
+        <button class="tab" data-view="tools">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L4 17l3 3 4.7-4.7a4.5 4.5 0 0 0 6-6L15 12l-3-3 2.7-2.7Z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/></svg>
+          <span>ابزارها</span>
         </button>
       </nav>
 
