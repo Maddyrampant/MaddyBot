@@ -1,4 +1,4 @@
-import { reg, registry, argText, replyLong, allGroups, commandsByGroup, groupLabel, escapeHtml } from "../utils.js";
+import { reg, registry, argText, replyLong, allGroups, commandsByGroup, groupLabel, escapeHtml, cmdDesc } from "../utils.js";
 
 const bootTime = Date.now();
 
@@ -18,35 +18,46 @@ export default function register(bot, { store }) {
 
   bot.command("start", async (ctx) => {
     await ctx.reply(
-      "Hello! I am MaddyBot.\n" +
-        "I can chat, translate, generate QR codes, play games, check the weather and much more.\n" +
-        "Type /commands to see everything I can do."
+      "سلام! من مادی‌بات هستم 🤖\n" +
+        "می‌تونم گفتگو کنم، ترجمه کنم، QR بسازم، بازی کنم، آب‌وهوا رو بگم و کلی کار دیگه.\n" +
+        "برای دیدن همهٔ فرمان‌ها <code>/commands</code> رو بفرست.",
+      { parse_mode: "HTML" }
     );
   });
 
   bot.command(["help", "commands"], async (ctx) => {
-    const arg = argText(ctx);
+    const arg = argText(ctx).trim().replace(/^\//, "");
+    let targetGroup = "";
+
     if (arg) {
-      const meta = registry[arg.replace(/^\//, "")];
+      const meta = registry[arg];
       if (meta) {
         return ctx.reply(
-          `/${meta.name}${meta.usage ? " " + meta.usage : ""}\n${meta.desc}\nGroup: ${groupLabel(meta.group)}`
+          `/<b>${meta.name}</b>${meta.usage ? " " + escapeHtml(meta.usage) : ""}\n${cmdDesc(arg)}\nگروه: ${groupLabel(meta.group)}`,
+          { parse_mode: "HTML" }
         );
       }
-      return ctx.reply("Unknown command: /" + arg);
+      const isGroup = allGroups().some(([k]) => k === arg);
+      if (isGroup) {
+        targetGroup = arg;
+      } else {
+        return ctx.reply("فرمان ناشناخته: /" + arg);
+      }
     }
 
-    const targetGroup = arg.trim();
-    let out = "<b>MaddyBot commands</b>\n\n";
+    let out = "<b>🤖 منوی ربات</b>\n";
+    out += "برای توضیح هر فرمان: <code>/help name</code> یا <code>/commands group</code>\n\n";
     for (const [key] of allGroups()) {
       const cmds = commandsByGroup(key);
       if (!cmds.length) continue;
       if (targetGroup && key !== targetGroup) continue;
       out += `<b>${groupLabel(key)}</b>\n`;
-      out += cmds.map((c) => `/${c.name}${c.usage ? " <i>" + escapeHtml(c.usage) + "</i>" : ""}`).join(" · ");
+      out += cmds
+        .map((c) => `/${c.name}${c.usage ? " <i>" + escapeHtml(c.usage) + "</i>" : ""}`)
+        .join(" · ");
       out += "\n\n";
     }
-    out += "Tip: /help <command> shows details for one command.";
+    out += "💡 نکته: <code>/help name</code> توضیح فارسی هر فرمان را نشان می‌دهد.";
     await replyLong(out, { parse_mode: "HTML" })(ctx);
   });
 
@@ -60,21 +71,21 @@ export default function register(bot, { store }) {
     const user = store.getUser(ctx.from.id);
     const from = ctx.from;
     const lines = [
-      `First name: ${from.first_name || "-"}`,
-      `Username: ${from.username ? "@" + from.username : "-"}`,
-      `User ID: <code>${from.id}</code>`,
-      `Messages sent to me: ${user.messageCount}`,
+      `نام: ${from.first_name || "-"}`,
+      `یوزرنیم: ${from.username ? "@" + from.username : "-"}`,
+      `آیدی: <code>${from.id}</code>`,
+      `پیام‌های ارسالی به من: ${user.messageCount}`,
     ];
-    if (user.birthday) lines.push(`Birthday: ${user.birthday}`);
-    if (user.todos.length) lines.push(`Open tasks: ${user.todos.filter((t) => !t.done).length}`);
-    if (user.reminders.length) lines.push(`Active reminders: ${user.reminders.length}`);
+    if (user.birthday) lines.push(`تولد: ${user.birthday}`);
+    if (user.todos.length) lines.push(`کارهای باز: ${user.todos.filter((t) => !t.done).length}`);
+    if (user.reminders.length) lines.push(`یادآوری‌های فعال: ${user.reminders.length}`);
     await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   });
 
   bot.command("about", async (ctx) => {
     await ctx.reply(
-      "MaddyBot is a multi-purpose Telegram assistant with 100+ commands:\n" +
-        "chat, translation, text tools, math, weather, QR codes, games, reminders and more."
+      "مادی‌بات یک دستیار تلگرامی چندمنظوره با بیش از ۱۰۰ فرمان است:\n" +
+        "گفتگو، ترجمه، ابزارهای متن، ریاضی، آب‌وهوا، QR، بازی، یادآوری و موارد دیگر."
     );
   });
 
@@ -83,42 +94,42 @@ export default function register(bot, { store }) {
     const chat = store.getChat(ctx.chat.id);
     const uptime = Math.floor((Date.now() - bootTime) / 1000);
     await ctx.reply(
-      `Users known: <code>${Object.keys(store.data.users).length}</code>\n` +
-        `Messages in this chat: <code>${chat.messageCount}</code>\n` +
-        `Your messages: <code>${user.messageCount}</code>\n` +
-        `Uptime: <code>${uptime}s</code>`,
+      `کاربران شناخته‌شده: <code>${Object.keys(store.data.users).length}</code>\n` +
+        `پیام‌های این چت: <code>${chat.messageCount}</code>\n` +
+        `پیام‌های شما: <code>${user.messageCount}</code>\n` +
+        `زمان فعالیت: <code>${uptime}s</code>`,
       { parse_mode: "HTML" }
     );
   });
 
   bot.command("version", async (ctx) => {
-    await ctx.reply("MaddyBot v1.0.0");
+    await ctx.reply("مادی‌بات نسخهٔ 1.0.0");
   });
 
   bot.command("ping", async (ctx) => {
     const start = Date.now();
-    await ctx.reply("Pong!");
-    await ctx.reply(`Round trip: ${Date.now() - start}ms`);
+    await ctx.reply("پونگ! 🏓");
+    await ctx.reply(`زمان رفت‌وبرگشت: ${Date.now() - start}ms`);
   });
 
   bot.command("settings", async (ctx) => {
     const s = store.getUser(ctx.from.id).settings;
-    await ctx.reply(`Your settings:\nTone: <code>${s.tone}</code>\nReply mode: <code>${s.replyMode}</code>`, {
+    await ctx.reply(`تنظیمات شما:\nلحن: <code>${s.tone}</code>\nحالت پاسخ: <code>${s.replyMode}</code>`, {
       parse_mode: "HTML",
     });
   });
 
   bot.command("feedback", async (ctx) => {
     const text = argText(ctx);
-    if (!text) return ctx.reply("Usage: /feedback <your feedback>");
+    if (!text) return ctx.reply("روش استفاده: /feedback <بازخورد شما>");
     store.addFeedback(`from ${ctx.from.id}: ${text}`);
-    await ctx.reply("Thanks! Your feedback was saved.");
+    await ctx.reply("ممنون! بازخورد شما ذخیره شد.");
   });
 
   bot.command("report", async (ctx) => {
     const text = argText(ctx);
-    if (!text) return ctx.reply("Usage: /report <problem description>");
+    if (!text) return ctx.reply("روش استفاده: /report <توضیح مشکل>");
     store.addFeedback(`REPORT from ${ctx.from.id}: ${text}`);
-    await ctx.reply("Issue reported. Thank you.");
+    await ctx.reply("مشکل ثبت شد. ممنون.");
   });
 }

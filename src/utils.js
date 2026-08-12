@@ -1,5 +1,7 @@
 export const registry = {};
 
+import { GROUPS_FA, DESCS_FA } from "./fa.js";
+
 const GROUPS = [
   ["core", "General"],
   ["ai", "AI Assistant"],
@@ -25,8 +27,13 @@ export function reg(name, meta) {
 }
 
 export function groupLabel(key) {
+  if (GROUPS_FA[key]) return GROUPS_FA[key];
   const found = GROUPS.find(([k]) => k === key);
   return found ? found[1] : key;
+}
+
+export function cmdDesc(name) {
+  return DESCS_FA[name] || registry[name]?.desc || "";
 }
 
 export function allGroups() {
