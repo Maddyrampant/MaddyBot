@@ -16,6 +16,9 @@
     imageMeta: null,
     pendingPrompt: null,
     tool: "memories",
+    localAI: false,
+    ollama: { up: false, models: [] },
+    sd: { up: false },
   };
 
   /* ---------- Telegram SDK ---------- */
@@ -135,6 +138,49 @@
     sc.scrollTop = sc.scrollHeight;
   }
 
+  async function refreshOllama() {
+    try {
+      const data = await apiJSON("/api/ollama");
+      state.ollama = data.ollama || { up: false, models: [] };
+      state.sd = data.sd || { up: false };
+    } catch {
+      state.ollama = { up: false, models: [] };
+      state.sd = { up: false };
+    }
+    renderAiMode();
+    return state.ollama;
+  }
+
+  function renderAiMode() {
+    const btn = $("aiModeBtn");
+    const hint = $("chat-mode-hint");
+    if (!btn) return;
+    if (state.localAI) {
+      btn.textContent = state.ollama.up ? "🖥 محلی" : "🖥 محلی (خاموش)";
+      hint.textContent = state.ollama.models.length
+        ? state.ollama.models.map((m) => m.name).join("، ")
+        : "مدلی موجود نیست";
+    } else {
+      btn.textContent = "☁️ ابری";
+      hint.textContent = "Gemini";
+    }
+    btn.classList.toggle("active", state.localAI);
+  }
+
+  async function toggleAiMode() {
+    if (!state.localAI) {
+      const oll = await refreshOllama();
+      if (!oll.up || !oll.models.length) {
+        toast("هوش محلی خاموش است. Ollama را روشن و مدل را دانلود کن.");
+        return;
+      }
+      state.localAI = true;
+    } else {
+      state.localAI = false;
+    }
+    renderAiMode();
+  }
+
   async function sendChat() {
     const input = $("chatInput");
     const text = input.value.trim();
@@ -145,7 +191,7 @@
     const bubble = addBubble("", "bot", { waiting: true });
 
     try {
-      const res = await api("/api/chat", {
+      const res = await api(state.localAI ? "/api/chat/local" : "/api/chat", {
         method: "POST",
         body: JSON.stringify({ message: text }),
       });
@@ -257,6 +303,7 @@
     { key: "format:png", label: "PNG" },
     { key: "format:webp", label: "WEBP" },
     { key: "watermark", label: "🏷 واترمارک", needsPrompt: true },
+    { key: "caption", label: "📝 نوشته روی عکس", needsPrompt: true },
   ];
 
   const AI_ACTIONS = [
@@ -423,6 +470,7 @@
       case "resize": return { width: "1080" };
       case "crop": return { ratio: param || "1:1" };
       case "watermark": return { text: prompt || "MaddyBot" };
+      case "caption": return { text: prompt || "" };
       case "upscale": return { scale: "2" };
       default: return {};
     }
@@ -1039,7 +1087,18 @@
         sendChat();
       }
     });
+    $("aiModeBtn").addEventListener("click", toggleAiMode);
     initImage();
+    refreshOllama().then(() => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = "🖥 هوش محلی: " + (state.ollama.up ? "روشن" : "خاموش");
+      $("statusChips").appendChild(chip);
+      const sdChip = document.createElement("span");
+      sdChip.className = "chip";
+      sdChip.textContent = "🖼 تصویر محلی: " + (state.sd.up ? "روشن" : "خاموش");
+      $("statusChips").appendChild(sdChip);
+    });
 
     try {
       const data = await apiJSON("/api/init");

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import config from "./config.js";
+import { completeOllama, chatOllamaStream } from "./ollama.js";
 
 export const CHAT_SYSTEM = `You are Madellin, an extraordinarily intelligent and emotionally aware assistant.
 
@@ -37,18 +38,56 @@ export function getAI() {
   return client;
 }
 
+function promptFromContents(contents) {
+  const list = Array.isArray(contents) ? contents : [contents];
+  return list
+    .map((c) => {
+      if (typeof c === "string") return c;
+      if (c && Array.isArray(c.parts)) {
+        return c.parts
+          .map((p) => (typeof p === "string" ? p : (p && p.text) || ""))
+          .join("\n");
+      }
+      if (c && typeof c.text === "string") return c.text;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function useOllama() {
+  if (config.aiMode === "ollama") return true;
+  if (config.aiMode === "auto" && !config.geminiKey) return true;
+  return false;
+}
+
+function isQuotaError(err) {
+  const m = String((err && (err.message || err.status)) || "");
+  return /429|RESOURCE_EXHAUSTED|quota|rate.?limit/i.test(m);
+}
+
 export async function generate(contents, system = TASK_SYSTEM, extra = {}) {
+  if (useOllama()) {
+    return completeOllama(promptFromContents(contents), [], system);
+  }
   if (!config.geminiKey) {
     throw new Error("NO_GEMINI_KEY");
   }
   if (!client) initAI();
-  const res = await client.models.generateContent({
-    model: config.model,
-    contents,
-    systemInstruction: system,
-    ...extra,
-  });
-  return (res.text || "").trim();
+  try {
+    const res = await client.models.generateContent({
+      model: config.model,
+      contents,
+      systemInstruction: system,
+      ...extra,
+    });
+    return (res.text || "").trim();
+  } catch (err) {
+    if (isQuotaError(err) && config.aiMode === "auto") {
+      return completeOllama(promptFromContents(contents), [], system);
+    }
+    throw err;
+  }
 }
 
 export function singlePrompt(prompt, system = TASK_SYSTEM) {
@@ -56,6 +95,9 @@ export function singlePrompt(prompt, system = TASK_SYSTEM) {
 }
 
 export function chat(prompt, history = [], system = CHAT_SYSTEM) {
+  if (useOllama()) {
+    return completeOllama(prompt, history, system);
+  }
   const contents = [
     ...history.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -67,29 +109,45 @@ export function chat(prompt, history = [], system = CHAT_SYSTEM) {
 }
 
 export async function* generateStream(contents, system = TASK_SYSTEM, extra = {}) {
+  if (useOllama()) {
+    yield* chatOllamaStream(promptFromContents(contents), [], system);
+    return;
+  }
   if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
   if (!client) initAI();
-  const res = await client.models.generateContentStream({
-    model: config.model,
-    contents,
-    systemInstruction: system,
-    ...extra,
-  });
-  let prev = "";
-  for await (const chunk of res) {
-    const t = chunk.text || "";
-    if (!t) continue;
-    if (prev === "" || !t.startsWith(prev)) {
-      yield t;
-    } else {
-      const delta = t.slice(prev.length);
-      if (delta) yield delta;
+  try {
+    const res = await client.models.generateContentStream({
+      model: config.model,
+      contents,
+      systemInstruction: system,
+      ...extra,
+    });
+    let prev = "";
+    for await (const chunk of res) {
+      const t = chunk.text || "";
+      if (!t) continue;
+      if (prev === "" || !t.startsWith(prev)) {
+        yield t;
+      } else {
+        const delta = t.slice(prev.length);
+        if (delta) yield delta;
+      }
+      prev = t;
     }
-    prev = t;
+  } catch (err) {
+    if (isQuotaError(err) && config.aiMode === "auto") {
+      yield* chatOllamaStream(promptFromContents(contents), [], system);
+      return;
+    }
+    throw err;
   }
 }
 
 export async function* chatStream(prompt, history = [], system = CHAT_SYSTEM) {
+  if (useOllama()) {
+    yield* chatOllamaStream(prompt, history, system);
+    return;
+  }
   const contents = [
     ...history.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🟩 Wordle</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 14px 10px; user-select: none; }
+  h1 { font-size: 22px; margin-bottom: 10px; }
+  .hud { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 16px; font-size: 14px; font-weight: 700; }
+  .pill b { color: #ffd166; }
+  #board { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; width: min(88vw, 320px); aspect-ratio: 5/6; }
+  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .cell { border: 2px solid #3a4556; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: min(7vw, 26px); font-weight: 800; text-transform: uppercase; background: #141c2b; transition: background .25s, transform .15s; font-family: ui-monospace, Consolas, monospace; }
+  .cell.flip { animation: flip .4s; }
+  .cell.g { background: #2f8f6b; border-color: #2f8f6b; }
+  .cell.y { background: #b28a2f; border-color: #b28a2f; }
+  .cell.n { background: #3a4254; border-color: #3a4254; }
+  @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+  #kb { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; width: min(94vw, 420px); margin-top: 14px; }
+  #kb .key { background: #2a3550; border: none; border-radius: 8px; color: #e8edf5; font-size: 15px; font-weight: 700; padding: 12px 0; cursor: pointer; text-transform: uppercase; }
+  #kb .key.wide { grid-column: span 2; font-size: 13px; }
+  #kb .key.g { background: #2f8f6b; } #kb .key.y { background: #b28a2f; } #kb .key.n { background: #3a4254; }
+  #kb .key:active { transform: scale(.95); }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.9); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .word { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 4px; font-family: ui-monospace, Consolas, monospace; }
+  #overlay .score { font-size: 44px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; max-height: 40vh; overflow-y: auto; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+  .hint { margin-top: 12px; font-size: 12px; color: #8b97ad; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>🟩 وردل</h1>
+  <div class="hud">
+    <div class="pill">حدس <b id="guesses">0</b>/6</div>
+    <div class="pill">زمان <b id="time">0</b>s</div>
+  </div>
+  <div id="board"></div>
+  <div id="kb"></div>
+  <div class="hint">کلمهٔ ۵ حرفی انگلیسی را در ۶ حدس پیدا کن. 🟩 سر جای خود، 🟨 جابه‌جا، ⬜ نیست.</div>
+
+  <div id="overlay">
+    <h2 id="oTitle">🎉 آفرین!</h2>
+    <div class="word" id="oWord"></div>
+    <div class="score" id="oScore"></div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "wordle";
+const ROWS = 6, LEN = 5;
+const ROWS_KEYS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+let words = [], answer = "", guesses = 0, cur = "", seconds = 0, timer, over = false;
+
+const $ = (id) => document.getElementById(id);
+
+function buildBoard() {
+  const b = $("board");
+  b.innerHTML = "";
+  for (let r = 0; r < ROWS; r++) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.id = "row" + r;
+    for (let c = 0; c < LEN; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      row.appendChild(cell);
+    }
+    b.appendChild(row);
+  }
+}
+
+function buildKb() {
+  const kb = $("kb");
+  ROWS_KEYS.forEach((r, ri) => {
+    r.split("").forEach(k => {
+      const b = document.createElement("button");
+      b.className = "key"; b.textContent = k; b.dataset.k = k;
+      b.addEventListener("click", () => keyPress(k));
+      kb.appendChild(b);
+    });
+    if (ri === 1) {
+      const back = document.createElement("button");
+      back.className = "key wide"; back.textContent = "⌫";
+      back.addEventListener("click", () => keyPress("BACK"));
+      kb.appendChild(back);
+    }
+  });
+}
+
+function keyPress(k) {
+  if (over) return;
+  if (k === "BACK") cur = cur.slice(0, -1);
+  else if (k === "ENTER") submit();
+  else if (cur.length < LEN) cur += k.toLowerCase();
+  paint();
+}
+
+function paint() {
+  const row = $("row" + guesses);
+  [...row.children].forEach((cell, i) => { cell.textContent = (cur[i] || "").toUpperCase(); });
+}
+
+async function submit() {
+  if (cur.length !== LEN) return;
+  if (!words.includes(cur)) { shake($("row" + guesses)); return; }
+  const freq = {};
+  [...answer].forEach(c => { freq[c] = (freq[c] || 0) + 1; });
+  const row = $("row" + guesses);
+  const cells = [...row.children];
+  const res = new Array(LEN).fill("n");
+  for (let i = 0; i < LEN; i++) if (cur[i] === answer[i]) { res[i] = "g"; freq[answer[i]]--; }
+  for (let i = 0; i < LEN; i++) if (res[i] !== "g" && answer.includes(cur[i]) && freq[cur[i]] > 0) { res[i] = "y"; freq[cur[i]]--; }
+  guesses++;
+  $("guesses").textContent = guesses;
+  cells.forEach((cell, i) => {
+    cell.textContent = cur[i].toUpperCase();
+    cell.classList.add(res[i]);
+    cell.style.animationDelay = (i * 60) + "ms";
+    cell.classList.add("flip");
+  });
+  const kbKeys = [...document.querySelectorAll("#kb .key")];
+  kbKeys.forEach(b => { const c = b.dataset.k; if (c && cur.includes(c.toLowerCase()) && b.className.indexOf("g") === -1) { if (res[cells.findIndex(x => x === cells[cur.indexOf(c.toLowerCase())])] === "g" || (cur.includes(c.toLowerCase()) && res[0] !== undefined && res[cur.indexOf(c.toLowerCase())] !== "n")) { if (cur.indexOf(c.toLowerCase()) !== -1) { const ci = cur.indexOf(c.toLowerCase()); if (res[ci] === "g") b.className = "key g"; else if (res[ci] === "y" && b.className.indexOf("g") === -1) b.className = "key y"; else b.className = "key n"; } } else if (cur.includes(c.toLowerCase())) { const ci = cur.indexOf(c.toLowerCase()); if (res[ci] === "g") b.className = "key g"; else if (res[ci] === "y" && b.className.indexOf("g") === -1) b.className = "key y"; else b.className = "key n"; } } });
+  cur = "";
+  if (res.every(r => r === "g")) return win();
+  if (guesses >= ROWS) return lose();
+  paint();
+}
+
+function shake(el) { el.style.animation = "none"; el.offsetHeight; el.style.animation = "shake .3s"; setTimeout(() => el.style.animation = "", 350); }
+const shakeCss = document.createElement("style");
+shakeCss.textContent = "@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }";
+document.head.appendChild(shakeCss);
+
+async function win() {
+  over = true;
+  clearInterval(timer);
+  const score = Math.max(150, 1000 - (guesses - 1) * 150);
+  $("oTitle").textContent = "🎉 آفرین!";
+  $("oWord").textContent = answer.toUpperCase();
+  $("oScore").textContent = score + " امتیاز";
+  GameSDK.saveLocalBest(KEY, score);
+  showOverlay(score);
+}
+
+async function lose() {
+  over = true;
+  clearInterval(timer);
+  $("oTitle").textContent = "😞 حدس‌ها تمام شد";
+  $("oWord").textContent = answer.toUpperCase();
+  $("oScore").textContent = "پاسخ: " + answer.toUpperCase();
+  showOverlay(0);
+}
+
+function showOverlay(score) {
+  GameSDK.submit(KEY, score).then(res => {
+    const top = (res && res.top) || [];
+    const el = $("boardTop");
+    if (top.length) {
+      el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+        top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${t.name || "کاربر"}</span><span>${t.score}</span></div>`).join("");
+    } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+    $("overlay").classList.add("show");
+  });
+}
+
+function reset() {
+  if (!words.length) return;
+  answer = words[Math.floor(Math.random() * words.length)];
+  guesses = 0; cur = ""; over = false; seconds = 0;
+  $("guesses").textContent = "0";
+  $("time").textContent = "0";
+  $("overlay").classList.remove("show");
+  buildBoard();
+  [...document.querySelectorAll("#kb .key")].forEach(b => { b.className = b.classList.contains("wide") ? "key wide" : "key"; });
+  clearInterval(timer);
+  timer = setInterval(() => { seconds++; $("time").textContent = seconds; }, 1000);
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter") keyPress("ENTER");
+  else if (e.key === "Backspace") keyPress("BACK");
+  else if (/^[a-zA-Z]$/.test(e.key)) keyPress(e.key.toUpperCase());
+});
+
+$("replay").addEventListener("click", reset);
+GameSDK.expand();
+buildKb();
+fetch("/api/gamedata?g=words").then(r => r.json()).then(d => {
+  words = (d.words || []).map(w => w.toLowerCase());
+  if (words.length < 500) { words = ["apple", "chair", "stone", "light", "music", "watch", "river", "sugar", "green", "sharp"]; }
+  reset();
+}).catch(() => { words = ["apple", "chair", "stone", "light", "music", "watch", "river", "sugar", "green", "sharp"]; reset(); });
+</script>
+</body>
+</html>

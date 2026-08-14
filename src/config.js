@@ -23,6 +23,12 @@ const config = {
   webhookEnabled: process.env.WEBHOOK_ENABLED === "true",
   webhookToken: process.env.WEBHOOK_TOKEN || "",
   redisUrl: process.env.REDIS_URL || "",
+  ollamaUrl: process.env.OLLAMA_URL || "http://127.0.0.1:11434",
+  ollamaModel: process.env.OLLAMA_MODEL || "qwen3:8b",
+  aiMode: process.env.AI_MODE || "auto",
+  localImage: process.env.LOCAL_IMAGE_ENABLED === "true",
+  localImageUrl: process.env.LOCAL_IMAGE_URL || "http://127.0.0.1:7861",
+  localImageSteps: Number(process.env.LOCAL_IMAGE_STEPS || 25),
 };
 
 export function validate() {

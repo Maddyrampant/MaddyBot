@@ -3,7 +3,9 @@ import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import config from "./config.js";
-import { getAI } from "./ai.js";
+import { getAI, singlePrompt } from "./ai.js";
+import { txt2imgLocal } from "./sd.js";
+import { renderTextPng } from "./persian_text.js";
 import { uid } from "./utils.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,6 +43,40 @@ export async function persistImage(buffer, ext) {
   const p = tmpPath(ext || "png");
   await fs.writeFile(p, buffer);
   return p;
+}
+
+/* Render Persian-shaped text and composite it at the bottom of an image. */
+async function overlayTextPng(input, txtPath, out) {
+  await runFFmpeg(
+    [
+      "-y",
+      "-i",
+      input,
+      "-i",
+      txtPath,
+      "-filter_complex",
+      "[0:v][1:v]overlay=(W-w)/2:H-h-24",
+      "-q:v",
+      "4",
+      out,
+    ],
+    120000
+  );
+}
+
+async function applyTextOverlay(input, text, fontSize, out, outExt, meta, w, h) {
+  const txtPng = await renderTextPng(text, { fontSize });
+  const txtPath = await persistImage(txtPng, "png");
+  try {
+    await overlayTextPng(input, txtPath, out);
+  } finally {
+    await cleanupFile(txtPath);
+  }
+  const buffer = await readImage(out);
+  const sz = await probeSize(out);
+  const finalMeta = { ...meta, w: sz ? sz.w : w, h: sz ? sz.h : h };
+  await cleanupFile(out);
+  return { buffer, ext: outExt, mime: mimeFromExt(outExt), meta: finalMeta };
 }
 
 export async function cleanupFiles(paths) {
@@ -348,14 +384,32 @@ export async function processLocal(input, { action, params = {} }) {
       break;
     }
     case "watermark": {
-      const text = drawTextEsc(params.text || "MaddyBot");
+      const text = String(params.text || "MaddyBot");
       if (!text) throw new Error("bad_params");
       const fs_ = Math.max(20, Math.round((h || 800) / 22));
+      if (/[\u0600-\u06FF]/.test(text)) {
+        return await applyTextOverlay(input, text, Math.max(28, fs_), out, outExt, meta, w, h);
+      }
+      const esc = drawTextEsc(text);
       filters = [
-        `drawtext=fontfile=${fontPath()}:text='${text}':fontsize=${fs_}:fontcolor=white@0.85:borderw=2:bordercolor=black@0.55:x=(w-text_w)/2:y=h-text_h-40`,
+        `drawtext=fontfile=${fontPath()}:text='${esc}':fontsize=${fs_}:fontcolor=white@0.85:borderw=2:bordercolor=black@0.55:x=(w-text_w)/2:y=h-text_h-40`,
       ];
       encode = ["-q:v", "5"];
       break;
+    }
+    case "caption": {
+      const text = String(params.text || "").trim();
+      if (!text) throw new Error("bad_params");
+      return await applyTextOverlay(
+        input,
+        text,
+        Math.max(36, Math.round((h || 800) / 14)),
+        out,
+        outExt,
+        meta,
+        w,
+        h
+      );
     }
     case "circle": {
       filters = [
@@ -458,10 +512,17 @@ function extractImage(res) {
  * @returns {Promise<{kind:'image', buffer:Buffer, mime:string, ext:string, text?:string}|{kind:'text', text:string}>}
  */
 export async function processAI(input, { action, prompt }) {
-  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
-  const ai = getAI();
   const a = String(action || "describe");
   const wantsImage = IMAGE_OUTPUT_ACTIONS.has(a);
+
+  if (a === "imagine" && config.localImage) {
+    const en = await toEnglishPrompt(prompt);
+    const out = await txt2imgLocal(en);
+    return { kind: "image", buffer: out.buffer, mime: out.mime, ext: "png", text: "" };
+  }
+
+  if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
+  const ai = getAI();
 
   const parts = [];
   if (input && a !== "imagine") {
@@ -502,6 +563,20 @@ export async function processAI(input, { action, prompt }) {
   } catch (err) {
     if (err.message === "AI_TIMEOUT") throw new Error("AI_TIMEOUT");
     throw err;
+  }
+}
+
+async function toEnglishPrompt(p) {
+  const s = String(p || "").trim();
+  if (!/[\u0600-\u06FF]/.test(s)) return s;
+  try {
+    const en = await singlePrompt(
+      "Translate this image generation prompt into English. Reply with only the English prompt, nothing else.\n\n" +
+        s
+    );
+    return (en || s).trim();
+  } catch {
+    return s;
   }
 }
 

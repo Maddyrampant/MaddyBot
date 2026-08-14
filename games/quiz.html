@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>❓ Quiz</title>
+<script src="/games/sdk.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, Tahoma, Arial, sans-serif; background: radial-gradient(circle at 50% 0%, #1b2740 0%, #0c1120 70%); color: #e8edf5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 18px 12px; user-select: none; }
+  .hud { display: flex; gap: 12px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .pill { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 16px; font-size: 14px; font-weight: 700; }
+  .pill b { color: #ffd166; }
+  h1 { font-size: 22px; margin-bottom: 14px; }
+  #cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; width: min(94vw, 480px); }
+  .cat { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 14px 10px; text-align: center; cursor: pointer; font-weight: 700; font-size: 14px; transition: transform .12s, background .12s; }
+  .cat:hover { transform: translateY(-2px); background: rgba(255,255,255,.13); }
+  .cat .n { display: block; font-size: 11px; color: #8b97ad; font-weight: 400; margin-top: 4px; }
+  #quiz { width: min(94vw, 520px); display: none; }
+  .q { font-size: 18px; font-weight: 700; line-height: 1.6; margin-bottom: 18px; min-height: 84px; }
+  .opts { display: grid; gap: 10px; }
+  .opt { background: rgba(255,255,255,.07); border: 2px solid rgba(255,255,255,.14); border-radius: 14px; padding: 13px 14px; cursor: pointer; font-size: 15px; transition: background .12s, transform .06s; }
+  .opt:active { transform: scale(.98); }
+  .opt.correct { background: #2f8f6b; border-color: #4ade80; }
+  .opt.wrong { background: #a13d3d; border-color: #f87171; }
+  .opt.disabled { pointer-events: none; opacity: .85; }
+  .opt .tag { display: inline-block; min-width: 22px; margin-left: 8px; font-weight: 800; color: #ffd166; }
+  #overlay { position: fixed; inset: 0; background: rgba(6,10,20,.9); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 20px; z-index: 10; }
+  #overlay.show { display: flex; }
+  #overlay h2 { font-size: 26px; color: #ffd166; }
+  #overlay .score { font-size: 44px; font-weight: 900; }
+  #overlay .board { width: min(90vw, 360px); background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px; max-height: 40vh; overflow-y: auto; }
+  #overlay .row { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 14px; }
+  #overlay .row.me { color: #ffd166; font-weight: 700; }
+  button.play { padding: 12px 42px; font-size: 18px; font-weight: 800; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd166, #f77f00); color: #10141f; cursor: pointer; }
+  .hint { margin-top: 14px; font-size: 12px; color: #8b97ad; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>❓ آزمون هوش</h1>
+  <div class="hud">
+    <div class="pill">درست <b id="right">0</b></div>
+    <div class="pill">سؤال <b id="cur">0</b>/10</div>
+    <div class="pill">رشته <b id="streak">0</b></div>
+  </div>
+  <div id="cats"><div class="cat" style="grid-column:1/-1;font-size:13px;color:#8b97ad">در حال بارگذاری سؤالات…</div></div>
+  <div id="quiz"></div>
+  <div class="hint">از بین ۴ گزینه، پاسخ درست را بزن. هر پاسخ درست ۱۰ امتیاز + ۵ امتیاز پاداش زنجیره دارد.</div>
+
+  <div id="overlay">
+    <h2>🏁 پایان بازی</h2>
+    <div class="score" id="oScore">0</div>
+    <div class="board" id="boardTop"></div>
+    <button class="play" id="replay">🔁 بازی دوباره</button>
+  </div>
+
+<script>
+"use strict";
+const KEY = "quiz";
+const ROUND = 10;
+const CATS = {
+  general: "دانش عمومی", videogames: "بازی‌های ویدیویی", science: "علم و طبیعت",
+  computers: "کامپیوتر", math: "ریاضی", geography: "جغرافیا", history: "تاریخ", animals: "حیوانات",
+};
+let bank = [];
+let catKeys = [];
+let round = [];
+let idx = 0, right = 0, streak = 0, bestStreak = 0, picking = false;
+
+const $ = (id) => document.getElementById(id);
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+async function load() {
+  try {
+    const r = await fetch("/api/gamedata?g=trivia");
+    const d = await r.json();
+    bank = (d.questions || []).filter(q => q && q.options && q.options.length >= 2 && q.q);
+    catKeys = shuffle([...new Set(bank.map(q => q.cat))]);
+    buildCats();
+  } catch {
+    $("cats").innerHTML = '<div class="cat" style="grid-column:1/-1">سؤالات در دسترس نیست. اینترنت را بررسی کن.</div>';
+  }
+}
+
+function buildCats() {
+  const el = $("cats");
+  el.innerHTML = "";
+  catKeys.forEach(c => {
+    const n = bank.filter(q => q.cat === c).length;
+    const d = document.createElement("div");
+    d.className = "cat";
+    d.innerHTML = (CATS[c] || c) + '<span class="n">' + n + " سؤال</span>";
+    d.addEventListener("click", () => start(c));
+    el.appendChild(d);
+  });
+  if (catKeys.length) {
+    const a = document.createElement("div");
+    a.className = "cat";
+    a.innerHTML = "🎲 همه موضوع‌ها<span class='n'>" + bank.length + " سؤال</span>";
+    a.addEventListener("click", () => start(null));
+    el.appendChild(a);
+  }
+}
+
+function start(cat) {
+  const pool = cat ? bank.filter(q => q.cat === cat) : bank;
+  round = shuffle(pool).slice(0, ROUND);
+  idx = 0; right = 0; streak = 0; bestStreak = 0;
+  $("cats").style.display = "none";
+  $("quiz").style.display = "block";
+  $("overlay").classList.remove("show");
+  show();
+}
+
+function show() {
+  if (idx >= round.length) return finish();
+  const q = round[idx];
+  $("cur").textContent = (idx + 1) + "/" + ROUND;
+  const qEl = $("quiz");
+  qEl.innerHTML = '<div class="q">' + esc(q.q) + "</div><div class='opts'></div>";
+  const opts = qEl.querySelector(".opts");
+  const labels = ["الف", "ب", "ج", "د"];
+  q.options.forEach((o, i) => {
+    const d = document.createElement("div");
+    d.className = "opt";
+    d.innerHTML = '<span class="tag">' + (labels[i] || i + 1) + "</span>" + esc(o);
+    d.addEventListener("click", () => pick(q, i, d, opts));
+    opts.appendChild(d);
+  });
+}
+
+function pick(q, i, el, opts) {
+  if (picking) return;
+  picking = true;
+  if (i === q.a) {
+    right++; streak++;
+    if (streak > bestStreak) bestStreak = streak;
+    el.classList.add("correct");
+    $("right").textContent = right;
+    $("streak").textContent = streak;
+  } else {
+    streak = 0;
+    el.classList.add("wrong");
+    opts.children[q.a].classList.add("correct");
+    $("streak").textContent = streak;
+  }
+  [...opts.children].forEach(c => c.classList.add("disabled"));
+  picking = false;
+  setTimeout(() => { idx++; show(); }, 1100);
+}
+
+function finish() {
+  const score = right * 10 + bestStreak * 5;
+  $("oScore").textContent = score;
+  GameSDK.saveLocalBest(KEY, score);
+  GameSDK.submit(KEY, score).then(res => {
+    const top = (res && res.top) || [];
+    const el = $("boardTop");
+    if (top.length) {
+      el.innerHTML = "<div class='row' style='color:#8b97ad'><span>رتبه</span><span>بازیکن</span><span>امتیاز</span></div>" +
+        top.map(t => `<div class="row${String(t.id) === String(GameSDK.userId) ? " me" : ""}"><span>${t.rank}.</span><span>${esc(t.name || "کاربر")}</span><span>${t.score}</span></div>`).join("");
+    } else el.innerHTML = "<div class='row' style='justify-content:center;color:#8b97ad'>برد ثبت نشد</div>";
+    $("overlay").classList.add("show");
+  });
+}
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+$("replay").addEventListener("click", () => { $("quiz").style.display = "none"; $("cats").style.display = ""; });
+GameSDK.expand();
+load();
+</script>
+</body>
+</html>

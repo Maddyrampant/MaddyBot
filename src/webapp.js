@@ -1,6 +1,6 @@
 import http from "node:http";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import config from "./config.js";
@@ -18,6 +18,8 @@ import { allGroups, commandsByGroup, groupLabel, cmdDesc, todayStr, uid } from "
 import { GAMES, gameByKey } from "./gamecatalog.js";
 import { processLocal, processAI, persistImage, cleanupFile, extFromMime } from "./image.js";
 import { buildChildSystem } from "./commands/onboarding.js";
+import { chatOllamaStream, ollamaStatus, isOllamaUp } from "./ollama.js";
+import { sdStatus } from "./sd.js";
 
 const ROOT = join(fileURLToPath(new URL("..", import.meta.url)));
 const PUBLIC_DIR = join(ROOT, "public");
@@ -209,6 +211,14 @@ function handleStatus(req, res, user) {
   });
 }
 
+async function handleOllama(req, res) {
+  json(res, 200, {
+    ok: true,
+    ollama: await ollamaStatus(),
+    sd: await sdStatus(),
+  });
+}
+
 async function handleChat(req, res, user, memory, store) {
   let body;
   try {
@@ -316,7 +326,64 @@ function handleGameTop(req, res, store) {
   });
 }
 
+async function handleChatLocal(req, res, user, memory) {
+  let body;
+  try {
+    body = JSON.parse(await readBody(req));
+  } catch {
+    return json(res, 400, { ok: false, error: "bad_body" });
+  }
+  const text = String(body.message || "").trim();
+  if (!text) return json(res, 400, { ok: false, error: "empty_message" });
+
+  const id = user.id;
+  memory.push(id, text, "user");
+  addMessage(id, "user", text);
+
+  if (!(await isOllamaUp())) {
+    return json(res, 503, { ok: false, error: "ollama_down" });
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  const send = (obj) => res.write(JSON.stringify(obj) + "\n");
+
+  try {
+    let answer = "";
+    for await (const delta of chatOllamaStream(text, memory.get(id).slice(0, -1))) {
+      if (!delta) continue;
+      answer += delta;
+      send({ delta });
+    }
+    if (!answer) answer = "متوجه نشدم؛ دوباره بگو.";
+    memory.push(id, answer, "assistant");
+    addMessage(id, "assistant", answer);
+    void extractFacts(id, [text, answer]);
+    send({ done: true });
+  } catch (err) {
+    console.error("webapp local chat error:", err);
+    send({ error: "server" });
+  } finally {
+    res.end();
+  }
+}
+
 /* ---------------- data endpoints ---------------- */
+
+const GAMEDATA_FILES = {
+  trivia: join(ROOT, "games", "data", "trivia.json"),
+  words: join(ROOT, "games", "data", "words.json"),
+};
+
+function handleGameData(req, res) {
+  const key = (new URL(req.url, "http://localhost").searchParams.get("g") || "").toLowerCase();
+  const file = GAMEDATA_FILES[key];
+  if (!file || !existsSync(file)) return notFound(res);
+  const payload = JSON.parse(readFileSync(file, "utf8"));
+  json(res, 200, payload);
+}
 
 function handleGames(req, res, user, store) {
   const games = GAMES.map((g) => ({
@@ -713,6 +780,10 @@ export function startWebApp({ memory, store, bot }) {
           return handleStatus(req, res, user);
         case pathname === "/api/chat" && req.method === "POST":
           return handleChat(req, res, user, memory, store);
+        case pathname === "/api/chat/local" && req.method === "POST":
+          return handleChatLocal(req, res, user, memory);
+        case pathname === "/api/ollama" && req.method === "GET":
+          return handleOllama(req, res);
         case pathname === "/api/memories" && req.method === "GET":
           return handleMemories(req, res, user);
         case pathname === "/api/memories" && req.method === "DELETE":
@@ -723,6 +794,8 @@ export function startWebApp({ memory, store, bot }) {
           return handleGameTop(req, res, store);
         case pathname === "/api/games" && req.method === "GET":
           return handleGames(req, res, user, store);
+        case pathname === "/api/gamedata" && req.method === "GET":
+          return handleGameData(req, res);
         case pathname === "/api/todos" && req.method === "GET":
           return handleTodos(req, res, user, store);
         case pathname === "/api/todos" && req.method === "POST":

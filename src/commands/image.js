@@ -104,6 +104,7 @@ function label(action) {
     sticker: "استیکر",
     thumbnail: "بندانگشتی",
     watermark: "واترمارک",
+    caption: "نوشته روی عکس",
     circle: "برش دایرهای",
     round: "گوشهگرد",
     upscale: "بزرگنمایی",
@@ -138,8 +139,9 @@ function mainKb() {
 function moreKb() {
   return new InlineKeyboard()
     .text("✂️ برش", "img:crop").text("📐 اندازه", "img:resize").text("📦 فرمت", "img:format").text("🌫 محو", "img:blur").row()
-    .text("✨ شارپ", "img:sharpen").text("🔎 بندانگشتی", "img:thumbnail").text("🏷 واترمارک", "img:watermark").text("🔍 بزرگنمایی", "img:upscale").row()
-    .text("🎨 سبک هنری", "img:style").text("🛠 ترمیم", "img:restore").text("🔳 اسکن QR", "img:qrscan").text("🚀 بزرگ AI", "img:upscaleai").row()
+    .text("✨ شارپ", "img:sharpen").text("🔎 بندانگشتی", "img:thumbnail").text("🏷 واترمارک", "img:watermark").text("📝 نوشته", "img:caption").row()
+    .text("🔍 بزرگنمایی", "img:upscale").text("🎨 سبک هنری", "img:style").text("🛠 ترمیم", "img:restore").text("🔳 اسکن QR", "img:qrscan").row()
+    .text("🚀 بزرگ AI", "img:upscaleai").row()
     .text("◀️ بازگشت", "img:main").text("✖️ بستن", "img:close");
 }
 
@@ -221,6 +223,7 @@ export default function register(bot) {
   reg("sticker", { desc: "Make a 512x512 Telegram sticker (webp)", group: "image" });
   reg("thumbnail", { desc: "Make a small thumbnail", group: "image" });
   reg("watermark", { usage: "<text>", desc: "Add a text watermark", group: "image" });
+  reg("caption", { usage: "<text>", desc: "Write Persian text under the photo", group: "image" });
   reg("circle", { desc: "Circular crop (avatar) with transparent background", group: "image" });
   reg("round", { usage: "[radius]", desc: "Rounded corners", group: "image" });
   reg("upscale", { usage: "<2|3|4>", desc: "Upscale locally (lanczos)", group: "image" });
@@ -303,6 +306,7 @@ export default function register(bot) {
   bot.command("sticker", (ctx) => runLocalCmd(ctx, "sticker", () => ({})));
   bot.command("thumbnail", (ctx) => runLocalCmd(ctx, "thumbnail", () => ({})));
   bot.command("watermark", (ctx) => runLocalCmd(ctx, "watermark", (a) => (a ? { text: a } : (() => { throw new Error("bad_params"); })())));
+  bot.command("caption", (ctx) => runLocalCmd(ctx, "caption", (a) => (a ? { text: a } : (() => { throw new Error("bad_params"); })())));
   bot.command("circle", (ctx) => runLocalCmd(ctx, "circle", () => ({})));
   bot.command("round", (ctx) => runLocalCmd(ctx, "round", (a) => ({ radius: a || "60" })));
   bot.command("upscale", (ctx) => runLocalCmd(ctx, "upscale", (a) => ({ scale: a || "2" })));

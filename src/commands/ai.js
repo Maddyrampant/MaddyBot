@@ -1,5 +1,7 @@
 import { reg, argText, replyLong } from "../utils.js";
 import { singlePrompt, chat } from "../ai.js";
+import config from "../config.js";
+import { chatOllamaStream, isOllamaUp, ollamaModels } from "../ollama.js";
 
 function txt(ctx) {
   return argText(ctx);
@@ -153,6 +155,57 @@ export default function register(bot, { memory }) {
       }
     });
   }
+  reg("localai", { usage: "<text>", desc: "Chat with the local AI (Ollama)", group: "ai" });
+  reg("aistatus", { desc: "Status of the local AI (Ollama)", group: "ai" });
+
+  bot.command("localai", async (ctx) => {
+    const input = txt(ctx);
+    if (!input) return ctx.reply("Usage: /localai <your message>");
+    const up = await isOllamaUp();
+    if (!up) {
+      return ctx.reply(
+        "Ollama is not running.\nStart it with: ollama serve\n" +
+          "Then make sure a model exists: ollama pull qwen3:8b"
+      );
+    }
+    await ctx.replyWithChatAction("typing");
+    const id = userIdFrom(ctx);
+    try {
+      memory.push(id, input, "user");
+      const history = memory.get(id).slice(0, -1);
+      let answer = "";
+      for await (const delta of chatOllamaStream(input, history)) {
+        answer += delta;
+      }
+      if (!answer) answer = "پاسخی دریافت نشد.";
+      memory.push(id, answer, "assistant");
+      await replyLong("🤖 <b>Ollama</b> — مدل محلی\n\n" + answer)(ctx);
+    } catch (err) {
+      console.error("localai error:", err);
+      await ctx.reply("خطا در ارتباط با مدل محلی. مطمئن شو Ollama روشن است و مدل دانلود شده.");
+    }
+  });
+
+  bot.command("aistatus", async (ctx) => {
+    const up = await isOllamaUp();
+    const models = up ? await ollamaModels() : [];
+    const lines = [
+      "🧠 <b>هوش مصنوعی محلی (Ollama)</b>",
+      "وضعیت: " + (up ? "✅ روشن" : "⛔ خاموش"),
+      "مدل پیش‌فرض: " + config.ollamaModel,
+      "حالت AI: " + config.aiMode + (config.aiMode !== "ollama" ? " (جایگزین هنگام نبود کلید Gemini)" : ""),
+    ];
+    if (models.length) {
+      lines.push("\nمدل‌های موجود:");
+      for (const m of models) {
+        const gb = (m.size / 1024 / 1024 / 1024).toFixed(2);
+        lines.push(`  • ${m.name} (${gb} GB)`);
+      }
+    } else {
+      lines.push("\nمدلی موجود نیست. برای دانلود: <code>ollama pull qwen3:8b</code>");
+    }
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+  });
 }
 
 function needTextUsage(name) {
