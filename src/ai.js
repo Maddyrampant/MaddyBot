@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import config from "./config.js";
-import { completeOllama, chatOllamaStream } from "./ollama.js";
+import { completeOllama, chatOllamaStream, embedOllama } from "./ollama.js";
 
 export const CHAT_SYSTEM = `You are Madellin, an extraordinarily intelligent and emotionally aware assistant.
 
@@ -241,6 +241,7 @@ export async function textToSpeech(text) {
 }
 
 export async function embed(text) {
+  if (useOllama()) return embedOllama(text);
   if (!config.geminiKey) throw new Error("NO_GEMINI_KEY");
   if (!client) initAI();
   const res = await client.models.embedContent({

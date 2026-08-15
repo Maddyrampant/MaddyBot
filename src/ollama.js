@@ -60,6 +60,30 @@ export async function ollamaStatus() {
   };
 }
 
+export async function embedOllama(text) {
+  const model = config.ollamaEmbedModel;
+  const payload = { model, input: String(text).slice(0, 8000) };
+  let res = await fetch(`${base()}/api/embed`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (res.status === 404) {
+    res = await fetch(`${base()}/api/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt: payload.input }),
+      signal: AbortSignal.timeout(60000),
+    });
+  }
+  if (!res.ok) throw new Error(`OLLAMA_EMBED_HTTP_${res.status}`);
+  const data = await res.json();
+  const vec = (data.data && data.data[0] && data.data[0].embedding) || data.embedding;
+  if (!vec || !vec.length) throw new Error("EMBED_EMPTY");
+  return Float32Array.from(vec);
+}
+
 export async function completeOllama(prompt, history = [], system = "") {
   const res = await withTimeout(
     fetch(`${base()}/api/chat`, {
@@ -69,7 +93,7 @@ export async function completeOllama(prompt, history = [], system = "") {
         model: config.ollamaModel,
         messages: messages(prompt, history, system),
         stream: false,
-        options: { num_ctx: 8192 },
+        think: false,
       }),
     }),
     180000
@@ -90,7 +114,7 @@ export async function* chatOllamaStream(prompt, history = [], system = "") {
         model: config.ollamaModel,
         messages: messages(prompt, history, system),
         stream: true,
-        options: { num_ctx: 8192 },
+        think: false,
       }),
     }),
     180000

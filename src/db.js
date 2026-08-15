@@ -64,5 +64,26 @@ function migrate(database) {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS research_docs (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      file    TEXT UNIQUE NOT NULL,
+      hash    TEXT NOT NULL,
+      title   TEXT NOT NULL,
+      date    TEXT,
+      sources TEXT DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS research_embeddings (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      doc_id      INTEGER NOT NULL REFERENCES research_docs(id) ON DELETE CASCADE,
+      file        TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      title       TEXT NOT NULL,
+      text        TEXT NOT NULL,
+      embedding   BLOB,
+      created_at  INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_research_embeddings_file ON research_embeddings(file);
   `);
 }

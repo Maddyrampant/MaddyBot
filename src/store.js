@@ -20,6 +20,7 @@ function newUserData() {
     meetings: [],
     habits: [],
     contacts: [],
+    teach: { i_am: [], i_am_not: [], recommend: [], good: [] },
   };
 }
 

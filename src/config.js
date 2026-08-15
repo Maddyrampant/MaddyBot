@@ -25,7 +25,9 @@ const config = {
   redisUrl: process.env.REDIS_URL || "",
   ollamaUrl: process.env.OLLAMA_URL || "http://127.0.0.1:11434",
   ollamaModel: process.env.OLLAMA_MODEL || "qwen3:8b",
+  ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL || "bge-m3",
   aiMode: process.env.AI_MODE || "auto",
+  researchDir: process.env.RESEARCH_DIR || "research",
   localImage: process.env.LOCAL_IMAGE_ENABLED === "true",
   localImageUrl: process.env.LOCAL_IMAGE_URL || "http://127.0.0.1:7861",
   localImageSteps: Number(process.env.LOCAL_IMAGE_STEPS || 25),
@@ -39,7 +41,7 @@ export function validate() {
     console.error("Copy .env.example to .env and fill in the values.");
     return false;
   }
-  if (!config.geminiKey) {
+  if (!config.geminiKey && config.aiMode !== "ollama") {
     console.warn("GEMINI_API_KEY is not set. Chat and AI commands will show a setup hint until you add it.");
   }
   if (!config.ownerId) {

@@ -1,6 +1,8 @@
 import config, { validate } from "./src/config.js";
 import { initAI, chat, CHAT_SYSTEM } from "./src/ai.js";
 import { MemoryStore, buildContext, addMessage, extractFacts } from "./src/memory.js";
+import { syncResearch, searchResearch } from "./src/research.js";
+import { teachToPrompt } from "./src/teach.js";
 import { Store } from "./src/store.js";
 import { startScheduler } from "./src/scheduler.js";
 import { replyLong } from "./src/utils.js";
@@ -28,11 +30,13 @@ import registerDev from "./src/commands/dev.js";
 import registerExtra from "./src/commands/extra.js";
 import registerAgent from "./src/commands/agent.js";
 import registerMemory from "./src/commands/memory.js";
+import registerTeach from "./src/commands/teach.js";
 import registerWebapp, { sendWebapp } from "./src/commands/webapp.js";
 import registerDownload from "./src/commands/download.js";
 import registerImage from "./src/commands/image.js";
 import registerVoice from "./src/commands/voice.js";
 import registerDocs from "./src/commands/docs.js";
+import registerResearch from "./src/commands/research.js";
 import registerPayments from "./src/commands/payments.js";
 import registerDigest from "./src/commands/digest.js";
 import registerAdmin from "./src/commands/admin.js";
@@ -45,6 +49,16 @@ getDb();
 
 const bot = new Bot(config.botToken);
 initAI();
+
+syncResearch()
+  .then((res) => {
+    if (res.enabled) {
+      console.log(
+        `Research ready: ${res.total} reports, ${res.indexed} new, ${res.skipped} skipped, ${res.removed} removed`
+      );
+    }
+  })
+  .catch((err) => console.error("research sync failed:", err.message));
 
 const memory = new MemoryStore("data/memory.json");
 const store = new Store("data/store.json");
@@ -76,6 +90,8 @@ registerDownload(bot);
 registerImage(bot);
 registerVoice(bot, deps);
 registerDocs(bot);
+registerResearch(bot);
+registerTeach(bot, deps);
 registerPayments(bot, deps);
 registerDigest(bot, deps);
 registerAdmin(bot);
@@ -142,11 +158,27 @@ async function handleChat(ctx, text) {
     memory.push(id, text, "user");
     addMessage(id, "user", text);
     let system = isChild ? buildChildSystem(store.data.firstUser) : CHAT_SYSTEM;
+    const extra = [];
     const mem = await buildContext(id, text).catch(() => null);
-    if (mem && (mem.facts || mem.summary)) {
-      const extra = [];
+    if (mem) {
       if (mem.summary) extra.push(`Ongoing conversation summary:\n${mem.summary}`);
       if (mem.facts) extra.push(`Long-term memories about this person:\n${mem.facts}`);
+    }
+    const teach = teachToPrompt(store.getUser(id));
+    if (teach) extra.push(teach);
+    const research = await searchResearch(text, 3).catch(() => []);
+    if (research.length) {
+      const notes = research
+        .map(
+          (r, i) =>
+            `${i + 1}. [${r.title}]\n${r.text.slice(0, 1000)}${r.text.length > 1000 ? "..." : ""}`
+        )
+        .join("\n\n");
+      extra.push(
+        "Relevant research notes from the saved reports (use these when they match the topic):\n" + notes
+      );
+    }
+    if (extra.length) {
       system = (system || "You are Madellin, a smart assistant.") + "\n\n" + extra.join("\n\n");
     }
     const answer = await chat(text, memory.get(id).slice(0, -1), system);
